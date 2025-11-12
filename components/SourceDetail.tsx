@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { DiscoveredLink, AccessMethod, Strategy } from '../types';
 import { SchemaEditor } from './SchemaEditor';
@@ -9,6 +8,8 @@ import TooltipWrapper from './TooltipWrapper';
 import { LinkIcon } from './icons/LinkIcon';
 import { RefineIcon } from './icons/RefineIcon';
 import { FileIcon } from './icons/FileIcon';
+import { PlayIcon } from './icons/PlayIcon';
+import { executeStrategy, downloadFile } from '../services/executorService';
 
 interface SourceDetailProps {
   source: DiscoveredLink | null;
@@ -33,16 +34,49 @@ const MarkdownContent: React.FC<{ content: string }> = ({ content }) => (
     </div>
 );
 
-const StrategyRenderer: React.FC<{ strategy: Strategy; method: AccessMethod }> = ({ strategy, method }) => {
+const StrategyRenderer: React.FC<{ strategy: Strategy; method: AccessMethod; url: string; onExecute: () => void; isExecuting: boolean; }> = ({ strategy, method, url, onExecute, isExecuting }) => {
     const { config, schema, snippet } = strategy;
 
+    const ExecuteButton = () => (
+        <button
+            onClick={onExecute}
+            disabled={isExecuting || method === 'LOCAL_FILE'}
+            className="flex items-center justify-center px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-300 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed shadow-md hover:shadow-lg disabled:shadow-none"
+        >
+            {isExecuting ? (
+                <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Running...
+                </>
+            ) : (
+                <>
+                    <PlayIcon className="h-4 w-4 mr-2" />
+                    Run Strategy
+                </>
+            )}
+        </button>
+    );
+
     if (method === 'DIRECT_DOWNLOAD') {
-        return snippet ? <CodeSnippet language="bash" code={snippet} /> : <p className="text-sm text-gray-500">No download command provided.</p>;
+        return (
+            <div className="space-y-4">
+                <div className="flex justify-end">
+                    <ExecuteButton />
+                </div>
+                {snippet ? <CodeSnippet language="bash" code={snippet} /> : <p className="text-sm text-gray-500">No download command provided.</p>}
+            </div>
+        );
     }
 
     if (method === 'API') {
         return (
             <div className="space-y-6">
+                <div className="flex justify-end">
+                    <ExecuteButton />
+                </div>
                 {snippet && (
                     <div>
                         <h4 className="text-md font-semibold text-gray-800 mb-2">API Request Snippet</h4>
@@ -62,6 +96,9 @@ const StrategyRenderer: React.FC<{ strategy: Strategy; method: AccessMethod }> =
     if (method === 'WEB_CRAWL') {
         return (
             <div className="space-y-6">
+                <div className="flex justify-end">
+                    <ExecuteButton />
+                </div>
                 {config && (
                     <div>
                         <h4 className="text-md font-semibold text-gray-800 mb-2">Firecrawl Configuration</h4>
@@ -156,6 +193,9 @@ const RefineStrategyForm: React.FC<{ onRefine?: (instructions: string) => void; 
 };
 
 const SourceDetail: React.FC<SourceDetailProps> = ({ source, isRefining, onRefine }) => {
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionResult, setExecutionResult] = useState<{ success: boolean; message: string } | null>(null);
+
   if (!source) {
     return (
       <div className="flex-1 p-8 flex items-center justify-center text-center bg-gray-50">
@@ -169,6 +209,45 @@ const SourceDetail: React.FC<SourceDetailProps> = ({ source, isRefining, onRefin
       </div>
     );
   }
+
+  const handleExecute = async () => {
+    setIsExecuting(true);
+    setExecutionResult(null);
+
+    try {
+      const strategyToExecute: Strategy = {
+        method: source.accessMethod,
+        url: source.url,
+        config: source.strategy.config ? JSON.parse(source.strategy.config) : undefined,
+        headers: {},
+        params: {},
+      };
+
+      const result = await executeStrategy(strategyToExecute);
+
+      if (result.success) {
+        if (source.accessMethod === 'DIRECT_DOWNLOAD' && result.data) {
+          downloadFile(result.data.data, result.data.filename, result.data.contentType);
+          setExecutionResult({ success: true, message: `File downloaded successfully: ${result.data.filename}` });
+        } else if (source.accessMethod === 'API') {
+          console.log('API Result:', result.data);
+          setExecutionResult({ success: true, message: 'API call successful! Check console for data.' });
+        } else if (source.accessMethod === 'WEB_CRAWL') {
+          console.log('Crawl Result:', result.data);
+          setExecutionResult({ success: true, message: 'Web crawl initiated! Check console for details.' });
+        }
+      } else {
+        setExecutionResult({ success: false, message: result.error || 'Execution failed' });
+      }
+    } catch (error) {
+      setExecutionResult({ 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Unknown error occurred' 
+      });
+    } finally {
+      setIsExecuting(false);
+    }
+  };
   
   const isLocalFile = source.accessMethod === 'LOCAL_FILE';
 
@@ -198,9 +277,23 @@ const SourceDetail: React.FC<SourceDetailProps> = ({ source, isRefining, onRefin
             <p className="text-gray-600 mt-1 italic">"{source.justification}"</p>
         </div>
 
+        {executionResult && (
+            <div className={`mt-4 p-4 rounded-lg ${executionResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                <p className={`text-sm font-medium ${executionResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                    {executionResult.message}
+                </p>
+            </div>
+        )}
+
         <div className="mt-6">
             <h3 className="text-xl font-semibold text-cyan-600 mb-4">Ingestion Strategy</h3>
-            <StrategyRenderer strategy={source.strategy} method={source.accessMethod} />
+            <StrategyRenderer 
+                strategy={source.strategy} 
+                method={source.accessMethod} 
+                url={source.url}
+                onExecute={handleExecute}
+                isExecuting={isExecuting}
+            />
         </div>
 
         {source.cleaningStrategy && (

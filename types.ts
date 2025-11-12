@@ -1,25 +1,45 @@
-
 export type AccessMethod = "DIRECT_DOWNLOAD" | "API" | "WEB_CRAWL" | "LOCAL_FILE";
+
+export type LLMProvider = "gemini" | "deepseek" | "qwen" | "openai" | "claude";
 
 export interface PlanSection {
   title: string;
   content: string;
 }
 
-/**
- * A structured object representing the AI-generated strategy.
- * This is more robust than parsing a markdown string.
- */
 export interface Strategy {
-    config?: string;  // Stringified JSON for Firecrawl config
-    schema?: string;  // Stringified JSON for data schema
-    snippet?: string; // Code snippet (e.g., curl, javascript, python)
+    config?: string;
+    schema?: string;
+    snippet?: string;
+    method: AccessMethod;
+    url: string;
+    headers?: Record<string, string>;
+    params?: Record<string, string>;
 }
 
 export interface DiscoveredLink {
     url: string;
     accessMethod: AccessMethod;
     justification: string;
-    strategy: Strategy; // Changed from string to a structured object
-    cleaningStrategy?: string; // Holds the result of the refinement agent
+    strategy: Strategy;
+    cleaningStrategy?: string;
+    validationStatus?: 'pending' | 'validating' | 'valid' | 'invalid';
+    crawlId?: string;
+    linkId?: string;
+}
+
+export interface ValidatedLink {
+    id: string;
+    url: string;
+    status: string;
+    metadata: any;
+    crawl_id?: string;
+    created_at: string;
+}
+
+export interface AIPlan {
+    id: string;
+    link_id: string;
+    plan_data: any;
+    created_at: string;
 }

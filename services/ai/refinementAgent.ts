@@ -1,41 +1,33 @@
+import { generateContent } from './client';
 
-import { ai } from './client';
+// Minimal prompt - only essential context
+const REFINEMENT_PROMPT = `Context: {STRATEGY_CONTEXT}
 
-const REFINEMENT_PROMPT = `
-You are an expert Data Pipeline Architect. Your task is to create a set of data cleaning and transformation steps based on user instructions, using an existing data ingestion strategy as context.
+User wants: "{CLEANING_INSTRUCTIONS}"
 
-**CRITICAL INSTRUCTIONS:**
-1.  **Generate Steps:** Read the user's cleaning instructions and generate a clear, step-by-step process for cleaning the data.
-2.  **Suggest Tools:** Suggest appropriate tools or libraries (e.g., Pandas in Python, shell commands like \`sed\`/\`awk\`).
-3.  **Use Markdown:** Format your response using markdown for clarity (e.g., bullet points).
-4.  **Output ONLY the Steps:** Your response should ONLY be the markdown content for the cleaning steps. Do not add any other titles, introductory text, or pleasantries.
-
----
-**Context (The Original Ingestion Strategy):**
-\`\`\`json
-{STRATEGY_CONTEXT}
-\`\`\`
----
-
-**User's Cleaning & Transformation Instructions:**
-"{CLEANING_INSTRUCTIONS}"
-`;
+Provide cleaning steps in markdown. Be concise.`;
 
 export async function getCleaningSteps(strategyContext: string, cleaningInstructions: string): Promise<string> {
     try {
+        // Truncate context if too long to save tokens
+        const truncatedContext = strategyContext.length > 800 
+            ? strategyContext.substring(0, 800) + '\n... (truncated)'
+            : strategyContext;
+            
         const prompt = REFINEMENT_PROMPT
-            .replace('{STRATEGY_CONTEXT}', strategyContext)
+            .replace('{STRATEGY_CONTEXT}', truncatedContext)
             .replace('{CLEANING_INSTRUCTIONS}', cleaningInstructions);
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
-            contents: prompt
+        const response = await generateContent({
+            prompt,
+            temperature: 0.4,
+            maxTokens: 800, // Reduced from unlimited
         });
 
-        return response.text;
+        return response;
 
     } catch (error) {
         console.error("Error in Refinement Agent:", error);
-        throw new Error("The AI failed to generate cleaning steps. Please try again.");
+        throw new Error("Failed to generate cleaning steps. Please try again.");
     }
 }

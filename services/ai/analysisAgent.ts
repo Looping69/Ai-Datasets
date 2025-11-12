@@ -1,23 +1,15 @@
-import { Type } from "@google/genai";
-import { ai } from './client';
+import { generateContent } from './client';
 
-const ANALYSIS_PROMPT = `
-You are an expert AI Web Analyst. Your task is to analyze a given URL and determine the most efficient, programmatic way to access the primary dataset it contains.
+// Ultra-minimal prompt - only essential info
+const ANALYSIS_PROMPT = `Classify URL: {URL}
 
-**URL to Analyze:** {URL}
+Rules:
+- DIRECT_DOWNLOAD: ends with .csv/.json/.xlsx/.zip OR contains /download/
+- API: contains /api/ OR api.
+- WEB_CRAWL: HTML page only
 
-**Analysis Steps:**
-1.  **Check for Direct Downloads:** Look for prominent links or buttons pointing directly to data files like CSV, JSON, ZIP, XLSX, etc.
-2.  **Check for an API:** Look for mentions of an API, API documentation, or network requests that return structured JSON data.
-3.  **Fallback to Web Crawling:** If no direct download or obvious API is available, the method must be web crawling.
-
-**Output Format:**
-You MUST respond with a JSON object. Do not add any other text or formatting.
-
--   **accessMethod:** Must be one of three exact strings: "DIRECT_DOWNLOAD", "API", or "WEB_CRAWL".
--   **target:** If method is "DIRECT_DOWNLOAD", this is the full download URL. If "API", this is the base API endpoint URL. If "WEB_CRAWL", this is the original URL.
--   **justification:** A brief, one-sentence explanation for your choice.
-`;
+JSON only:
+{"accessMethod": "DIRECT_DOWNLOAD|API|WEB_CRAWL", "target": "url", "justification": "brief reason"}`;
 
 export type AccessMethod = "DIRECT_DOWNLOAD" | "API" | "WEB_CRAWL";
 
@@ -27,48 +19,99 @@ export interface AnalysisResult {
     justification: string;
 }
 
+// Pattern detection - NO LLM needed for obvious cases
+function detectDirectDownload(url: string): boolean {
+    const downloadExtensions = ['.csv', '.json', '.xlsx', '.xls', '.zip', '.tar', '.gz', '.parquet', '.xml', '.tsv', '.txt', '.pdf'];
+    const downloadPatterns = ['/download/', '/export/', '/file/', '/data/files/', '/static/data/', '/datasets/download'];
+    
+    const lowerUrl = url.toLowerCase();
+    
+    if (downloadExtensions.some(ext => lowerUrl.endsWith(ext))) {
+        return true;
+    }
+    
+    if (downloadPatterns.some(pattern => lowerUrl.includes(pattern))) {
+        return true;
+    }
+    
+    return false;
+}
+
+function detectAPI(url: string): boolean {
+    const lowerUrl = url.toLowerCase();
+    return lowerUrl.includes('/api/') || lowerUrl.includes('api.') || lowerUrl.includes('?format=json');
+}
+
 export async function analyzeUrlForAccessMethod(url: string): Promise<AnalysisResult> {
     try {
+        // OPTIMIZATION: Pattern matching first - saves 100% of tokens for obvious cases
+        if (detectDirectDownload(url)) {
+            return {
+                accessMethod: "DIRECT_DOWNLOAD",
+                target: url,
+                justification: "Direct file URL detected by pattern."
+            };
+        }
+        
+        if (detectAPI(url)) {
+            return {
+                accessMethod: "API",
+                target: url,
+                justification: "API endpoint detected by pattern."
+            };
+        }
+
+        // Only use LLM for ambiguous cases
         const prompt = ANALYSIS_PROMPT.replace('{URL}', url);
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
-            contents: prompt,
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        accessMethod: { type: Type.STRING },
-                        target: { type: Type.STRING },
-                        justification: { type: Type.STRING },
-                    },
-                    required: ["accessMethod", "target", "justification"],
-                }
-            }
+        
+        const response = await generateContent({
+            prompt,
+            temperature: 0.2, // Very low for consistent classification
+            maxTokens: 200, // Minimal - just need classification
         });
 
-        const resultJson = JSON.parse(response.text);
+        let jsonText = response.trim();
+        
+        if (jsonText.startsWith('```json')) {
+            jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        } else if (jsonText.startsWith('```')) {
+            jsonText = jsonText.replace(/```\n?/g, '');
+        }
+        
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            jsonText = jsonMatch[0];
+        }
 
-        // Validate the accessMethod value
+        const resultJson = JSON.parse(jsonText);
+
         const validMethods: AccessMethod[] = ["DIRECT_DOWNLOAD", "API", "WEB_CRAWL"];
         if (resultJson && validMethods.includes(resultJson.accessMethod)) {
             return resultJson;
         } else {
-             // Fallback if the model hallucinates a method
-            console.warn(`Analysis agent returned invalid accessMethod: ${resultJson.accessMethod}. Defaulting to WEB_CRAWL.`);
+            console.warn(`Invalid accessMethod: ${resultJson.accessMethod}. Defaulting to WEB_CRAWL.`);
             return {
                 accessMethod: "WEB_CRAWL",
                 target: url,
-                justification: "The access method could not be determined, defaulting to web crawl."
+                justification: "Could not determine method, defaulting to crawl."
             };
         }
     } catch (error) {
         console.error(`Error in Analysis Agent for URL ${url}:`, error);
-        // Fallback on any error to ensure the pipeline doesn't stop
+        
+        // Fallback with pattern matching
+        if (detectDirectDownload(url)) {
+            return {
+                accessMethod: "DIRECT_DOWNLOAD",
+                target: url,
+                justification: "Fallback: URL pattern suggests direct download."
+            };
+        }
+        
         return {
             accessMethod: "WEB_CRAWL",
             target: url,
-            justification: "An error occurred during analysis, defaulting to web crawl as a fallback."
+            justification: "Error occurred, defaulting to web crawl."
         };
     }
 }

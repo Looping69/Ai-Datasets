@@ -1,17 +1,16 @@
-import { Type } from "@google/genai";
-import { ai } from './client';
+import { generateContent } from './client';
 
-const DISCOVERY_PROMPT = `
-You are an expert AI Research Assistant. Your mission is to find specific, direct URLs to dataset pages or download links based on a user's request.
+// Minimal, focused prompt - reduced from verbose instructions
+const DISCOVERY_PROMPT = `Find 6-8 direct dataset URLs for: "{DATASET_DESCRIPTION}"
 
-**CRITICAL INSTRUCTIONS:**
-1.  Prioritize direct links to dataset landing pages, CSV files, JSON files, or data portals.
-2.  AVOID generic links to repository homepages (like the front page of Kaggle or data.gov).
-3.  Return a list of 6-8 high-quality URLs.
+Return ONLY valid JSON:
+{"urls": ["url1", "url2", ...]}
 
-Here is the user's description of the dataset they need:
-"{DATASET_DESCRIPTION}"
-`;
+Prioritize:
+- Direct file links (.csv, .json, .xlsx, .zip)
+- Dataset landing pages
+- API endpoints
+NO generic homepages.`;
 
 export interface DiscoveryResult {
     urls: string[];
@@ -21,35 +20,35 @@ export async function findDatasetUrls(datasetDescription: string): Promise<Disco
     try {
         const prompt = DISCOVERY_PROMPT.replace('{DATASET_DESCRIPTION}', datasetDescription);
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
-            contents: prompt,
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        urls: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.STRING
-                            }
-                        }
-                    }
-                }
-            }
+        const response = await generateContent({
+            prompt,
+            temperature: 0.5, // Lower temp = more focused
+            maxTokens: 800, // Reduced from 2000
         });
 
-        const resultJson = JSON.parse(response.text);
-        // Basic validation
+        // Clean and extract JSON
+        let jsonText = response.trim();
+        if (jsonText.startsWith('```json')) {
+            jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        } else if (jsonText.startsWith('```')) {
+            jsonText = jsonText.replace(/```\n?/g, '');
+        }
+        
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            jsonText = jsonMatch[0];
+        }
+
+        const resultJson = JSON.parse(jsonText);
+        
         if (resultJson && Array.isArray(resultJson.urls)) {
             return resultJson;
         } else {
-            throw new Error("Discovery agent returned an invalid format.");
+            throw new Error("Invalid format from discovery agent.");
         }
 
     } catch (error) {
         console.error("Error in Discovery Agent:", error);
-        throw new Error("The AI failed to discover dataset URLs. Please try refining your description.");
+        throw new Error("Failed to discover dataset URLs. Try refining your description.");
     }
 }
