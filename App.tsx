@@ -64,10 +64,11 @@ const App: React.FC = () => {
 
     try {
         const sourceToRefine = discoveredSources[sourceIndex];
-        const refinedStrategy = await refineSourceStrategyWithCleaning(sourceToRefine.strategy, cleaningInstructions);
+        // The planner function now takes the whole object and returns an updated one.
+        const refinedSource = await refineSourceStrategyWithCleaning(sourceToRefine, cleaningInstructions);
         
         const newSources = [...discoveredSources];
-        newSources[sourceIndex] = { ...sourceToRefine, strategy: refinedStrategy };
+        newSources[sourceIndex] = refinedSource;
         setDiscoveredSources(newSources);
 
     } catch (err) {

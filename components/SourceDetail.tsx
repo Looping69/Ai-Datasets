@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import type { DiscoveredLink, AccessMethod } from '../types';
+import type { DiscoveredLink, AccessMethod, Strategy } from '../types';
 import { SchemaEditor } from './SchemaEditor';
 import { FirecrawlConfigEditor } from './FirecrawlConfigEditor';
 import { CodeSnippet } from './CodeSnippet';
@@ -16,120 +16,88 @@ interface SourceDetailProps {
   onRefine?: (instructions: string) => void;
 }
 
-const StrategyRenderer: React.FC<{ strategy: string; method: AccessMethod }> = ({ strategy, method }) => {
-    // Check for a cleaning section added by the refinement agent
-    const strategyParts = strategy.split('### Data Cleaning & Transformation');
-    const mainStrategy = strategyParts[0];
-    const cleaningStrategy = strategyParts.length > 1 ? strategyParts[1] : '';
+const MarkdownContent: React.FC<{ content: string }> = ({ content }) => (
+    <div className="prose prose-sm max-w-none text-gray-700 mt-4 space-y-3">
+        {content.split('\n').filter(line => line.trim() !== '').map((line, idx) => {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+                return (
+                    <div key={idx} className="flex items-start">
+                        <span className="mr-3 mt-1.5 text-cyan-500 flex-shrink-0">•</span>
+                        <span>{trimmedLine.substring(2)}</span>
+                    </div>
+                );
+            }
+            return <p key={idx}>{trimmedLine}</p>;
+        })}
+    </div>
+);
 
-    const codeBlocks = mainStrategy.match(/```(\w+)?\n([\s\S]*?)```/g) || [];
+const StrategyRenderer: React.FC<{ strategy: Strategy; method: AccessMethod }> = ({ strategy, method }) => {
+    const { config, schema, snippet } = strategy;
+
+    if (method === 'DIRECT_DOWNLOAD') {
+        return snippet ? <CodeSnippet language="bash" code={snippet} /> : <p className="text-sm text-gray-500">No download command provided.</p>;
+    }
+
+    if (method === 'API') {
+        return (
+            <div className="space-y-6">
+                {snippet && (
+                    <div>
+                        <h4 className="text-md font-semibold text-gray-800 mb-2">API Request Snippet</h4>
+                        <CodeSnippet language="javascript" code={snippet} />
+                    </div>
+                )}
+                {schema && (
+                    <div>
+                        <h4 className="text-md font-semibold text-gray-800 mb-2">Proposed Data Schema</h4>
+                        <SchemaEditor initialJsonString={schema} />
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    if (method === 'WEB_CRAWL') {
+        return (
+            <div className="space-y-6">
+                {config && (
+                    <div>
+                        <h4 className="text-md font-semibold text-gray-800 mb-2">Firecrawl Configuration</h4>
+                        <FirecrawlConfigEditor initialJsonString={config} />
+                    </div>
+                )}
+                {schema && (
+                    <div>
+                        <h4 className="text-md font-semibold text-gray-800 mb-2">Proposed Data Schema</h4>
+                        <SchemaEditor initialJsonString={schema} />
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    if (method === 'LOCAL_FILE') {
+        return (
+            <div className="space-y-6">
+                {snippet && (
+                    <div>
+                        <h4 className="text-md font-semibold text-gray-800 mb-2">Python Processing Snippet</h4>
+                        <CodeSnippet language="python" code={snippet} />
+                    </div>
+                )}
+                {schema && (
+                    <div>
+                        <h4 className="text-md font-semibold text-gray-800 mb-2">Inferred Data Schema</h4>
+                        <SchemaEditor initialJsonString={schema} />
+                    </div>
+                )}
+            </div>
+        );
+    }
     
-    const renderMainStrategy = () => {
-        if (method === 'DIRECT_DOWNLOAD') {
-            const bashCode = codeBlocks.find((b: string) => b.startsWith('```bash'))?.replace(/```bash\n|```/g, '').trim();
-            return bashCode ? <CodeSnippet language="bash" code={bashCode} /> : <p className="text-sm text-gray-500">No download command provided.</p>;
-        }
-
-        if (method === 'API') {
-            const jsCode = codeBlocks.find((b: string) => b.startsWith('```javascript'))?.replace(/```javascript\n|```/g, '').trim();
-            const jsonSchema = codeBlocks.find((b: string) => b.startsWith('```json'))?.replace(/```json\n|```/g, '').trim();
-            return (
-                <div className="space-y-6">
-                    {jsCode && (
-                        <div>
-                            <h4 className="text-md font-semibold text-gray-800 mb-2">API Request Snippet</h4>
-                            <CodeSnippet language="javascript" code={jsCode} />
-                        </div>
-                    )}
-                    {jsonSchema && (
-                        <div>
-                            <h4 className="text-md font-semibold text-gray-800 mb-2">Proposed Data Schema</h4>
-                            <SchemaEditor initialJsonString={jsonSchema} />
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        if (method === 'WEB_CRAWL') {
-            const jsonCodeBlocks = codeBlocks.filter((b: string) => b.startsWith('```json'));
-            const firecrawlConfigBlock = jsonCodeBlocks.find((b: string) => b.includes('"url":'));
-            const schemaBlock = jsonCodeBlocks.find((b: string) => !b.includes('"url":'));
-
-            const firecrawlConfig = firecrawlConfigBlock?.replace(/```json\n|```/g, '').trim();
-            const jsonSchema = schemaBlock?.replace(/```json\n|```/g, '').trim();
-            
-            return (
-                <div className="space-y-6">
-                    {firecrawlConfig && (
-                        <div>
-                            <h4 className="text-md font-semibold text-gray-800 mb-2">Firecrawl Configuration</h4>
-                            <FirecrawlConfigEditor initialJsonString={firecrawlConfig} />
-                        </div>
-                    )}
-                    {jsonSchema && (
-                        <div>
-                            <h4 className="text-md font-semibold text-gray-800 mb-2">Proposed Data Schema</h4>
-                            <SchemaEditor initialJsonString={jsonSchema} />
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        if (method === 'LOCAL_FILE') {
-            const pythonCode = codeBlocks.find((b: string) => b.startsWith('```python'))?.replace(/```python\n|```/g, '').trim();
-            const jsonSchema = codeBlocks.find((b: string) => b.startsWith('```json'))?.replace(/```json\n|```/g, '').trim();
-            return (
-                <div className="space-y-6">
-                    {pythonCode && (
-                        <div>
-                            <h4 className="text-md font-semibold text-gray-800 mb-2">Python Processing Snippet</h4>
-                            <CodeSnippet language="python" code={pythonCode} />
-                        </div>
-                    )}
-                    {jsonSchema && (
-                        <div>
-                            <h4 className="text-md font-semibold text-gray-800 mb-2">Inferred Data Schema</h4>
-                            <SchemaEditor initialJsonString={jsonSchema} />
-                        </div>
-                    )}
-                </div>
-            );
-        }
-        
-        return <p className="text-sm text-gray-500">Could not render strategy.</p>;
-    };
-
-    const MarkdownContent: React.FC<{ content: string }> = ({ content }) => (
-        <div className="prose prose-sm max-w-none text-gray-700 mt-4 space-y-3">
-            {content.split('\n').filter(line => line.trim() !== '').map((line, idx) => {
-                const trimmedLine = line.trim();
-                if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-                    return (
-                        <div key={idx} className="flex items-start">
-                            <span className="mr-3 mt-1.5 text-cyan-500 flex-shrink-0">•</span>
-                            <span>{trimmedLine.substring(2)}</span>
-                        </div>
-                    );
-                }
-                if (trimmedLine.startsWith('```')) return null; // Hide code blocks as they are handled elsewhere
-                return <p key={idx}>{trimmedLine}</p>;
-            })}
-        </div>
-    );
-
-    return (
-        <div>
-            {renderMainStrategy()}
-            {cleaningStrategy && (
-                <div className="mt-8 pt-6 border-t border-dashed border-gray-300">
-                    <h4 className="text-lg font-semibold text-cyan-600">Data Cleaning & Transformation</h4>
-                    <MarkdownContent content={cleaningStrategy} />
-                </div>
-            )}
-        </div>
-    )
+    return <p className="text-sm text-gray-500">Could not render strategy.</p>;
 };
 
 
@@ -140,6 +108,7 @@ const RefineStrategyForm: React.FC<{ onRefine?: (instructions: string) => void; 
 
     const handleRefineClick = () => {
         onRefine(cleaningInstructions);
+        setCleaningInstructions(''); // Clear input after submission
     };
 
     const isRefineDisabled = isRefining || !cleaningInstructions.trim();
@@ -233,6 +202,13 @@ const SourceDetail: React.FC<SourceDetailProps> = ({ source, isRefining, onRefin
             <h3 className="text-xl font-semibold text-cyan-600 mb-4">Ingestion Strategy</h3>
             <StrategyRenderer strategy={source.strategy} method={source.accessMethod} />
         </div>
+
+        {source.cleaningStrategy && (
+            <div className="mt-8 pt-6 border-t border-dashed border-gray-300">
+                <h4 className="text-lg font-semibold text-cyan-600">Data Cleaning & Transformation</h4>
+                <MarkdownContent content={source.cleaningStrategy} />
+            </div>
+        )}
 
         <RefineStrategyForm isRefining={isRefining} onRefine={onRefine} />
       </div>

@@ -6,9 +6,20 @@ export interface PlanSection {
   content: string;
 }
 
+/**
+ * A structured object representing the AI-generated strategy.
+ * This is more robust than parsing a markdown string.
+ */
+export interface Strategy {
+    config?: string;  // Stringified JSON for Firecrawl config
+    schema?: string;  // Stringified JSON for data schema
+    snippet?: string; // Code snippet (e.g., curl, javascript, python)
+}
+
 export interface DiscoveredLink {
     url: string;
     accessMethod: AccessMethod;
     justification: string;
-    strategy: string;
+    strategy: Strategy; // Changed from string to a structured object
+    cleaningStrategy?: string; // Holds the result of the refinement agent
 }

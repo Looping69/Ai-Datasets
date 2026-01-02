@@ -2,7 +2,7 @@
 import { findDatasetUrls } from './discoveryAgent';
 import { analyzeUrlForAccessMethod } from './analysisAgent';
 import { generateStrategy, generateFileStrategy } from './strategyAgent';
-import { refineStrategy } from './refinementAgent';
+import { getCleaningSteps } from './refinementAgent';
 import type { DiscoveredLink } from '../../types';
 
 // Web discovery orchestrator
@@ -14,27 +14,43 @@ export async function createFullIngestionPlan(datasetDescription: string): Promi
         return [];
     }
 
-    // Step 2 & 3: Analyze each URL and generate a strategy for it (in parallel)
-    const sources = await Promise.all(
-        discoveryResult.urls.map(async (url) => {
+    // Step 2 & 3: Analyze and generate strategies sequentially to avoid rate limiting.
+    const sources: DiscoveredLink[] = [];
+    for (const url of discoveryResult.urls) {
+        try {
             const analysis = await analyzeUrlForAccessMethod(url);
             const strategyResult = await generateStrategy(analysis.accessMethod, analysis.target);
-            return {
+            sources.push({
                 url,
                 accessMethod: analysis.accessMethod,
                 justification: analysis.justification,
-                strategy: strategyResult.strategy.trim(),
-            };
-        })
-    );
-
+                strategy: strategyResult,
+            });
+        } catch (error) {
+            console.error(`Skipping source ${url} due to an error during processing:`, error);
+            // We'll just skip this source to keep the UI clean if one fails.
+        }
+    }
+    
     return sources;
 }
 
 // Local file plan orchestrator
 export async function createPlanForLocalFile(file: File): Promise<DiscoveredLink> {
-    const MAX_SNIPPET_SIZE = 4096; // 4KB
-    const fileContentSnippet = await file.text().then(text => text.slice(0, MAX_SNIPPET_SIZE));
+    const CHUNK_SIZE = 2048; // 2KB
+    let fileContentSnippet = '';
+
+    // Read the first chunk to capture headers and initial data
+    const headBlob = file.slice(0, CHUNK_SIZE);
+    fileContentSnippet += await headBlob.text();
+
+    // If the file is large enough, sample from the middle to get representative data
+    if (file.size > CHUNK_SIZE * 2) {
+        const middleStart = Math.floor(file.size / 2) - Math.floor(CHUNK_SIZE / 2);
+        const middleBlob = file.slice(middleStart, middleStart + CHUNK_SIZE);
+        const middleText = await middleBlob.text();
+        fileContentSnippet += `\n\n... (sample from middle of file) ...\n\n` + middleText;
+    }
 
     const strategyResult = await generateFileStrategy(file.name, fileContentSnippet);
 
@@ -42,14 +58,23 @@ export async function createPlanForLocalFile(file: File): Promise<DiscoveredLink
         url: file.name,
         accessMethod: 'LOCAL_FILE',
         justification: `An ingestion plan generated for the uploaded file '${file.name}'.`,
-        strategy: strategyResult.strategy.trim(),
+        strategy: strategyResult,
     };
 }
 
 
-export async function refineSourceStrategyWithCleaning(originalStrategy: string, cleaningInstructions: string): Promise<string> {
+export async function refineSourceStrategyWithCleaning(source: DiscoveredLink, cleaningInstructions: string): Promise<DiscoveredLink> {
     if (!cleaningInstructions.trim()) {
-        return originalStrategy;
+        return source;
     }
-    return refineStrategy(originalStrategy, cleaningInstructions);
+
+    // Provide the original strategy as context for the refinement agent
+    const strategyContext = JSON.stringify(source.strategy, null, 2);
+    const cleaningSteps = await getCleaningSteps(strategyContext, cleaningInstructions);
+    
+    // Return a new source object with the cleaning steps added
+    return {
+        ...source,
+        cleaningStrategy: cleaningSteps
+    };
 }

@@ -1,27 +1,30 @@
+
 import { ai } from './client';
 
-const STRATEGY_REFINEMENT_PROMPT = `
-You are an expert Data Pipeline Architect. Your task is to refine an existing data ingestion strategy by incorporating user-provided data cleaning and transformation steps.
+const REFINEMENT_PROMPT = `
+You are an expert Data Pipeline Architect. Your task is to create a set of data cleaning and transformation steps based on user instructions, using an existing data ingestion strategy as context.
 
 **CRITICAL INSTRUCTIONS:**
-1.  **Append, Don't Replace:** Read the user's cleaning instructions and add a new section titled "### Data Cleaning & Transformation" to the END of the original strategy.
-2.  **Preserve Original Strategy:** The original strategy content (e.g., code snippets, configuration) must be kept intact at the beginning of the output.
-3.  **Provide Actionable Steps:** In the new cleaning section, convert the user's high-level instructions into a clear, step-by-step process. Suggest tools or libraries where appropriate (e.g., Pandas in Python, or shell commands like \`sed\`/\`awk\`). Use markdown formatting for clarity (e.g. bullet points).
-4.  **Maintain Formatting:** The final output must be a single, cohesive Markdown document.
+1.  **Generate Steps:** Read the user's cleaning instructions and generate a clear, step-by-step process for cleaning the data.
+2.  **Suggest Tools:** Suggest appropriate tools or libraries (e.g., Pandas in Python, shell commands like \`sed\`/\`awk\`).
+3.  **Use Markdown:** Format your response using markdown for clarity (e.g., bullet points).
+4.  **Output ONLY the Steps:** Your response should ONLY be the markdown content for the cleaning steps. Do not add any other titles, introductory text, or pleasantries.
 
-**Original Strategy:**
-\`\`\`markdown
-{ORIGINAL_STRATEGY}
+---
+**Context (The Original Ingestion Strategy):**
+\`\`\`json
+{STRATEGY_CONTEXT}
 \`\`\`
+---
 
 **User's Cleaning & Transformation Instructions:**
 "{CLEANING_INSTRUCTIONS}"
 `;
 
-export async function refineStrategy(originalStrategy: string, cleaningInstructions: string): Promise<string> {
+export async function getCleaningSteps(strategyContext: string, cleaningInstructions: string): Promise<string> {
     try {
-        const prompt = STRATEGY_REFINEMENT_PROMPT
-            .replace('{ORIGINAL_STRATEGY}', originalStrategy)
+        const prompt = REFINEMENT_PROMPT
+            .replace('{STRATEGY_CONTEXT}', strategyContext)
             .replace('{CLEANING_INSTRUCTIONS}', cleaningInstructions);
 
         const response = await ai.models.generateContent({
@@ -33,6 +36,6 @@ export async function refineStrategy(originalStrategy: string, cleaningInstructi
 
     } catch (error) {
         console.error("Error in Refinement Agent:", error);
-        throw new Error("The AI failed to refine the strategy. Please try again.");
+        throw new Error("The AI failed to generate cleaning steps. Please try again.");
     }
 }
