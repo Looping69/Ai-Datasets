@@ -16,28 +16,43 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const languageLabel = {
-      bash: 'Shell Command',
-      javascript: 'JavaScript Snippet',
-      json: 'JSON',
-      python: 'Python Script',
-  }[language];
-
   return (
-    <div className="bg-gray-800 rounded-lg overflow-hidden my-2">
-      <div className="flex justify-between items-center px-4 py-2 bg-gray-700">
-        <span className="text-xs font-semibold text-gray-300 uppercase">{languageLabel}</span>
+    <div className="bg-[var(--bg-void)] border border-[var(--border-dim)] relative"
+      style={{ clipPath: 'var(--clip-panel-sm)' }}>
+      {/* Header Bar */}
+      <div className="flex justify-between items-center px-4 py-2 border-b border-[var(--border-dim)] bg-[var(--bg-surface)]">
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-[var(--red-error)] opacity-60"></div>
+            <div className="w-2 h-2 rounded-full bg-[var(--orange-warn)] opacity-60"></div>
+            <div className="w-2 h-2 rounded-full bg-[var(--green-status)] opacity-60"></div>
+          </div>
+          <span className="hud-label text-[var(--cyan-primary)]">{language.toUpperCase()}</span>
+        </div>
+
         <button
           onClick={handleCopy}
-          className="flex items-center text-xs text-gray-300 hover:text-white font-semibold transition-colors"
+          className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--cyan-primary)] transition-colors text-xs font-medium uppercase tracking-wider"
         >
-          <CopyIcon className="h-4 w-4 mr-2" />
-          {copied ? 'Copied!' : 'Copy'}
+          <CopyIcon className="h-3.5 w-3.5" />
+          {copied ? 'COPIED' : 'COPY'}
         </button>
       </div>
-      <pre className="p-4 text-sm text-white whitespace-pre-wrap font-mono">
-        <code>{code}</code>
-      </pre>
+
+      {/* Code Content */}
+      <div className="p-4 overflow-x-auto">
+        <pre className="text-[var(--cyan-bright)] text-sm leading-relaxed font-mono">
+          <code>{code}</code>
+        </pre>
+      </div>
+
+      {/* Bottom Decorations */}
+      <div className="px-4 py-2 border-t border-[var(--border-dim)] flex items-center justify-between bg-[var(--bg-surface)]">
+        <span className="hud-label text-[var(--text-muted)]">{code.split('\n').length} LINES</span>
+        <div className="hud-barcode scale-75 origin-right">
+          {[...Array(8)].map((_, i) => <span key={i}></span>)}
+        </div>
+      </div>
     </div>
   );
 };

@@ -28,7 +28,7 @@ export async function getCleaningSteps(strategyContext: string, cleaningInstruct
             .replace('{CLEANING_INSTRUCTIONS}', cleaningInstructions);
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.0-flash-exp',
             contents: prompt
         });
 

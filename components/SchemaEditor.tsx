@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { PlusIcon } from './icons/PlusIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -25,7 +26,7 @@ export const SchemaEditor: React.FC<SchemaEditorProps> = ({ initialJsonString })
     try {
       const schemaObj = JSON.parse(initialJsonString);
       if (typeof schemaObj !== 'object' || schemaObj === null) {
-          throw new Error('Invalid schema format');
+        throw new Error('Invalid schema format');
       }
       const initialFields = Object.entries(schemaObj).map(([name, type], index) => ({
         id: `field-${index}-${Date.now()}`,
@@ -35,7 +36,7 @@ export const SchemaEditor: React.FC<SchemaEditorProps> = ({ initialJsonString })
       setFields(initialFields);
     } catch (e) {
       console.error("Failed to parse initial schema JSON:", e);
-      setFields([]); // Fallback to an empty editor on error
+      setFields([]);
     }
   }, [initialJsonString]);
 
@@ -74,74 +75,77 @@ export const SchemaEditor: React.FC<SchemaEditorProps> = ({ initialJsonString })
   };
 
   return (
-    <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-      <div className="flex justify-between items-center mb-3">
-         <h4 className="text-md font-semibold text-gray-700 flex items-center">
-            <span>Interactive Schema Editor</span>
-            <Tooltip text="A schema defines the structure of your final dataset. Define the fields (columns) you want to extract and their corresponding data types (e.g., `string` for text, `number` for integers). You can add, remove, and edit fields here before copying the final JSON structure." />
-         </h4>
-        <TooltipWrapper tooltipText="Copies the current schema structure to your clipboard as a formatted JSON object.">
+    <div className="bg-[var(--bg-surface)] border border-[var(--border-dim)] p-6"
+      style={{ clipPath: 'var(--clip-panel-sm)' }}>
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-2">
+          <span className="hud-label text-[var(--text-normal)]">SCHEMA</span>
+          <span className="hud-label text-[var(--text-muted)]">[{fields.length} FIELDS]</span>
+        </div>
+        <TooltipWrapper tooltipText="Copy schema as JSON.">
           <button
-              onClick={handleCopy}
-              className="flex items-center text-sm px-3 py-1.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 focus:ring-cyan-500 transition-colors duration-300"
+            onClick={handleCopy}
+            className="hud-button py-1.5 px-4 text-xs"
           >
-              <CopyIcon className="h-4 w-4 mr-2" />
-              {copied ? 'Copied!' : 'Copy as JSON'}
+            <span className="flex items-center gap-2">
+              <CopyIcon className="h-3.5 w-3.5" />
+              {copied ? 'COPIED' : 'COPY'}
+            </span>
           </button>
         </TooltipWrapper>
       </div>
-     
-      <div className="space-y-3">
+
+      <div className="space-y-2">
         {fields.map((field, index) => (
-          <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
-            <div className="col-span-6">
-              <div className="flex items-center w-full">
-                <input
-                  type="text"
-                  value={field.name}
-                  onChange={e => handleFieldChange(field.id, 'name', e.target.value)}
-                  placeholder="Field Name"
-                  className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-gray-800 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none text-sm"
-                />
-                {index === 0 && <Tooltip text="The name of the data column (e.g., 'product_name', 'user_id')." />}
-              </div>
-            </div>
-            <div className="col-span-5">
-              <div className="flex items-center w-full">
-                <select
-                  value={field.type}
-                  onChange={e => handleFieldChange(field.id, 'type', e.target.value)}
-                  className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-gray-800 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none text-sm"
-                >
-                  <option value="string">string</option>
-                  <option value="number">number</option>
-                  <option value="boolean">boolean</option>
-                  <option value="object">object</option>
-                  <option value="array">array</option>
-                  <option value="date">date</option>
-                </select>
-                {index === 0 && <Tooltip text="The expected data type for this field (e.g., 'string' for text, 'number' for integers)." />}
-              </div>
-            </div>
-            <div className="col-span-1 flex justify-center">
-              <TooltipWrapper tooltipText="Removes this field from the schema.">
-                <button onClick={() => removeField(field.id)} className="text-gray-400 hover:text-red-500 p-1 rounded-full transition-colors">
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              </TooltipWrapper>
-            </div>
+          <div key={field.id} className="flex items-center gap-3 bg-[var(--bg-void)] p-3 group border border-[var(--border-dim)]"
+            style={{ clipPath: 'polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px))' }}>
+            {/* Index */}
+            <span className="hud-label text-[var(--text-muted)] w-6">{(index + 1).toString().padStart(2, '0')}</span>
+
+            {/* Field Name */}
+            <input
+              type="text"
+              value={field.name}
+              onChange={e => handleFieldChange(field.id, 'name', e.target.value)}
+              placeholder="field_name"
+              className="flex-1 bg-transparent border-none outline-none text-[var(--cyan-bright)] font-mono text-sm placeholder-[var(--text-muted)]"
+            />
+
+            <span className="text-[var(--text-muted)]">:</span>
+
+            {/* Field Type */}
+            <select
+              value={field.type}
+              onChange={e => handleFieldChange(field.id, 'type', e.target.value)}
+              className="bg-[var(--bg-panel)] border border-[var(--border-dim)] text-[var(--text-normal)] text-sm py-1 px-3 outline-none cursor-pointer focus:border-[var(--cyan-primary)]"
+            >
+              <option value="string">STRING</option>
+              <option value="number">NUMBER</option>
+              <option value="boolean">BOOLEAN</option>
+              <option value="object">OBJECT</option>
+              <option value="array">ARRAY</option>
+              <option value="date">DATE</option>
+            </select>
+
+            {/* Delete Button */}
+            <button
+              onClick={() => removeField(field.id)}
+              className="text-[var(--text-muted)] hover:text-[var(--red-error)] transition-colors p-1 opacity-0 group-hover:opacity-100"
+            >
+              <TrashIcon className="h-4 w-4" />
+            </button>
           </div>
         ))}
       </div>
-       <TooltipWrapper tooltipText="Adds a new, empty row to the schema for you to define another field.">
-        <button
-          onClick={addField}
-          className="mt-4 flex items-center w-full justify-center text-sm px-4 py-2 border-2 border-dashed border-gray-300 text-gray-500 rounded-md hover:bg-cyan-50 hover:border-cyan-400 hover:text-cyan-600 transition-colors duration-200"
-        >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Add Field
-        </button>
-      </TooltipWrapper>
+
+      <button
+        onClick={addField}
+        className="mt-4 w-full py-3 border border-dashed border-[var(--border-dim)] text-[var(--text-muted)] text-sm font-medium hover:border-[var(--cyan-primary)] hover:text-[var(--cyan-primary)] transition-all flex items-center justify-center gap-2"
+        style={{ clipPath: 'var(--clip-panel-sm)' }}
+      >
+        <PlusIcon className="h-4 w-4" />
+        ADD FIELD
+      </button>
     </div>
   );
 };

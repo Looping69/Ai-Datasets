@@ -22,7 +22,7 @@ export async function findDatasetUrls(datasetDescription: string): Promise<Disco
         const prompt = DISCOVERY_PROMPT.replace('{DATASET_DESCRIPTION}', datasetDescription);
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.0-flash-exp',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',

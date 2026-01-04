@@ -31,7 +31,7 @@ export async function analyzeUrlForAccessMethod(url: string): Promise<AnalysisRe
     try {
         const prompt = ANALYSIS_PROMPT.replace('{URL}', url);
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.0-flash-exp',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',

@@ -1,85 +1,111 @@
 
 import React from 'react';
-import type { DiscoveredLink, AccessMethod } from '../types';
-import { DownloadIcon } from './icons/DownloadIcon';
-import { ApiIcon } from './icons/ApiIcon';
-import { CrawlIcon } from './icons/CrawlIcon';
+import type { DiscoveredLink } from '../types';
+import { CheckIcon } from './icons/CheckIcon';
+import { MagnifyingGlassIcon } from './icons/MagnifyingGlassIcon';
+import { LinkIcon } from './icons/LinkIcon';
 import { FileIcon } from './icons/FileIcon';
-
 
 interface SidebarProps {
   sources: DiscoveredLink[];
   selectedSource: number | null;
-  onSelectSource: (selection: number) => void;
+  onSelectSource: (index: number) => void;
   isLoading: boolean;
   hasSearched: boolean;
 }
 
-const getIconForMethod = (method: AccessMethod) => {
-    const iconProps = { className: "h-5 w-5 mr-3 text-gray-500 flex-shrink-0" };
-    switch (method) {
-        case 'DIRECT_DOWNLOAD': return <DownloadIcon {...iconProps} />;
-        case 'API': return <ApiIcon {...iconProps} />;
-        case 'WEB_CRAWL': return <CrawlIcon {...iconProps} />;
-        case 'LOCAL_FILE': return <FileIcon {...iconProps} />;
-        default: return <CrawlIcon {...iconProps} />;
-    }
-};
-
 const Sidebar: React.FC<SidebarProps> = ({ sources, selectedSource, onSelectSource, isLoading, hasSearched }) => {
-  if (isLoading) {
-      return (
-          <aside className="w-1/3 max-w-sm bg-white border-r border-gray-200 p-4">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Discovering Sources...</h2>
-              <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                      <div key={i} className="bg-gray-200 h-12 rounded-md animate-pulse"></div>
-                  ))}
-              </div>
-          </aside>
-      );
-  }
-    
-  if (!hasSearched) {
-    return (
-      <aside className="w-1/3 max-w-sm bg-white border-r border-gray-200 p-4">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Discovered Sources</h2>
-        <div className="text-center text-gray-500 mt-8 px-4">
-            <p className="text-sm">Generate a plan to see discovered data sources here.</p>
-        </div>
-      </aside>
-    );
-  }
-
   return (
-    <aside className="w-1/3 max-w-sm bg-white border-r border-gray-200 p-4 overflow-y-auto">
-      <h2 className="text-lg font-semibold text-gray-800 mb-4">Discovered Sources</h2>
-      <nav>
-        {sources.length === 0 && !isLoading && (
-             <div className="text-center text-gray-500 mt-8 px-4">
-                <p className="text-sm">No sources were found for this query.</p>
-            </div>
+    <aside className="w-72 border-r border-[var(--border-dim)] bg-[var(--bg-panel)] flex flex-col relative">
+      {/* Header */}
+      <div className="p-5 border-b border-[var(--border-dim)]">
+        <div className="flex items-center justify-between mb-2">
+          <span className="hud-label text-[var(--cyan-primary)]">DISCOVERED NODES</span>
+          <span className="hud-title text-lg">{sources.length.toString().padStart(2, '0')}</span>
+        </div>
+        <div className="hud-loading-bar"></div>
+      </div>
+
+      {/* Source List */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {isLoading && sources.length === 0 && (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-[var(--bg-surface)] border border-[var(--border-dim)] animate-pulse"
+                style={{ clipPath: 'var(--clip-panel-sm)' }}></div>
+            ))}
+          </div>
         )}
-        <ul>
-          {sources.map((source, index) => (
-            <li key={index}>
-              <button
-                onClick={() => onSelectSource(index)}
-                className={`w-full text-left flex items-center p-3 my-1 rounded-lg transition-colors duration-200 ${
-                  selectedSource === index
-                    ? 'bg-cyan-100 text-cyan-800 font-semibold'
-                    // Check if selectedSource is null for the initial load case
-                    : 'hover:bg-gray-100 text-gray-700'
+
+        {!isLoading && !hasSearched && (
+          <div className="h-full flex flex-col items-center justify-center text-center p-6">
+            <div className="w-12 h-12 border border-[var(--border-dim)] flex items-center justify-center mb-4"
+              style={{ clipPath: 'var(--clip-panel-sm)' }}>
+              <MagnifyingGlassIcon className="h-5 w-5 text-[var(--text-muted)]" />
+            </div>
+            <span className="hud-label">NO ACTIVE SCAN</span>
+            <p className="text-[var(--text-muted)] text-sm mt-2">Initialize reconnaissance to discover data nodes.</p>
+          </div>
+        )}
+
+        {sources.map((source, index) => {
+          const isSelected = selectedSource === index;
+          const isLocal = source.accessMethod === 'LOCAL_FILE';
+
+          return (
+            <button
+              key={index}
+              onClick={() => onSelectSource(index)}
+              className={`w-full text-left p-4 transition-all relative group ${isSelected
+                  ? 'bg-[var(--cyan-dim)] border-l-2 border-l-[var(--cyan-primary)]'
+                  : 'bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border-l-2 border-l-transparent'
                 }`}
-                title={source.url}
-              >
-                {getIconForMethod(source.accessMethod)}
-                <span className="truncate text-sm">{source.url}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
+              style={{ clipPath: 'var(--clip-panel-sm)' }}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 ${isSelected ? 'text-[var(--cyan-primary)]' : 'text-[var(--text-muted)]'}`}>
+                    {isLocal ? <FileIcon className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className={`font-semibold text-sm truncate ${isSelected ? 'text-[var(--cyan-primary)]' : 'text-[var(--text-normal)]'}`}>
+                      {source.title || (isLocal ? 'LOCAL_ASSET' : 'REMOTE_NODE')}
+                    </h3>
+                    <div className="hud-label mt-1">
+                      {source.accessMethod.replace('_', ' ')}
+                    </div>
+                  </div>
+                </div>
+
+                {isSelected && (
+                  <div className="flex-shrink-0">
+                    <CheckIcon className="h-4 w-4 text-[var(--cyan-primary)]" />
+                  </div>
+                )}
+              </div>
+
+              {/* Index Number */}
+              <div className="absolute top-2 right-2 hud-label text-[10px] opacity-50">
+                {(index + 1).toString().padStart(2, '0')}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Footer Stats */}
+      {hasSearched && sources.length > 0 && (
+        <div className="p-4 border-t border-[var(--border-dim)] bg-[var(--bg-void)]">
+          <div className="flex justify-between items-center">
+            <span className="hud-label">SCAN COMPLETE</span>
+            <div className="flex gap-1">
+              {[...Array(sources.length)].map((_, i) => (
+                <div key={i} className={`w-2 h-2 ${selectedSource === i ? 'bg-[var(--cyan-primary)]' : 'bg-[var(--border-dim)]'}`}></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 };

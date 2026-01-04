@@ -1,150 +1,196 @@
 
 import React, { useState, useCallback } from 'react';
-import Header from './components/Header';
-import SearchForm from './components/SearchForm';
-import LoadingSpinner from './components/LoadingSpinner';
-import ErrorMessage from './components/ErrorMessage';
-import Sidebar from './components/Sidebar';
-import SourceDetail from './components/SourceDetail';
-import CollapsedSearch from './components/CollapsedSearch';
-import { createFullIngestionPlan, refineSourceStrategyWithCleaning, createPlanForLocalFile } from './services/ai/planner';
+import { useDiscovery } from './hooks/useDiscovery';
 import type { DiscoveredLink } from './types';
 
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import SearchForm from './components/SearchForm';
+import SourceDetail from './components/SourceDetail';
+import LoadingSpinner from './components/LoadingSpinner';
+import ErrorMessage from './components/ErrorMessage';
+import CollapsedSearch from './components/CollapsedSearch';
+import LandingPage from './components/LandingPage';
+import DocumentationPage from './components/DocumentationPage';
+
+type ViewState = 'landing' | 'app' | 'docs';
 
 const App: React.FC = () => {
+  const [view, setView] = useState<ViewState>('landing');
+
   const [discoveredSources, setDiscoveredSources] = useState<DiscoveredLink[]>([]);
   const [selectedSource, setSelectedSource] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isRefining, setIsRefining] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState<boolean>(false);
-  const [searchDescription, setSearchDescription] = useState<string>('');
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchDescription, setSearchDescription] = useState('');
 
-  const handleGeneratePlan = useCallback(async (description: string, file?: File) => {
-    if (!description.trim() && !file) {
-      setError('Please provide a description or upload a file.');
-      return;
-    }
-    
+  const { discoverDatasets, refineSource, extractLocalFile } = useDiscovery();
+
+  const handleEnterSystem = useCallback(() => {
+    setView('app');
+  }, []);
+
+  const handleViewDocs = useCallback(() => {
+    setView('docs');
+  }, []);
+
+  const handleBackToLanding = useCallback(() => {
+    setView('landing');
+  }, []);
+
+  const handleGeneratePlan = useCallback(async (description: string, file: File | null) => {
     setIsLoading(true);
     setError(null);
+    setHasSearched(true);
+    setSearchDescription(description || file?.name || 'File Analysis');
     setDiscoveredSources([]);
     setSelectedSource(null);
-    setHasSearched(true);
 
     try {
+      let sources: DiscoveredLink[] = [];
       if (file) {
-        setSearchDescription(`Plan for local file: ${file.name}`);
-        const source = await createPlanForLocalFile(file);
-        setDiscoveredSources([source]);
-        setSelectedSource(0);
+        const localSource = await extractLocalFile(file);
+        sources.push(localSource);
+      }
+      if (description.trim()) {
+        const webSources = await discoverDatasets(description);
+        sources = [...sources, ...webSources];
+      }
+
+      if (sources.length === 0 && !file && !description.trim()) {
+        setError('Please provide a description or upload a file.');
       } else {
-        setSearchDescription(description);
-        const sources = await createFullIngestionPlan(description);
         setDiscoveredSources(sources);
         if (sources.length > 0) {
           setSelectedSource(0);
         }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [discoverDatasets, extractLocalFile]);
 
-  const handleRefineSource = useCallback(async (sourceIndex: number, cleaningInstructions: string) => {
-    if (!cleaningInstructions.trim()) {
-        setError('Please provide some cleaning instructions to refine the plan.');
-        return;
-    }
+  const handleRefineSource = useCallback(async (sourceIndex: number, instructions: string) => {
+    if (sourceIndex < 0 || sourceIndex >= discoveredSources.length) return;
 
     setIsRefining(true);
     setError(null);
-
     try {
-        const sourceToRefine = discoveredSources[sourceIndex];
-        // The planner function now takes the whole object and returns an updated one.
-        const refinedSource = await refineSourceStrategyWithCleaning(sourceToRefine, cleaningInstructions);
-        
-        const newSources = [...discoveredSources];
-        newSources[sourceIndex] = refinedSource;
-        setDiscoveredSources(newSources);
-
-    } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred during refinement.');
+      const currentSource = discoveredSources[sourceIndex];
+      const refined = await refineSource(currentSource, instructions);
+      setDiscoveredSources(prev =>
+        prev.map((src, i) => i === sourceIndex ? refined : src)
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Refinement failed.');
     } finally {
-        setIsRefining(false);
+      setIsRefining(false);
     }
-  }, [discoveredSources]);
+  }, [discoveredSources, refineSource]);
 
-  const handleNewSearch = () => {
+  const handleNewSearch = useCallback(() => {
     setHasSearched(false);
     setDiscoveredSources([]);
     setSelectedSource(null);
     setError(null);
     setSearchDescription('');
-  };
+  }, []);
+
+  if (view === 'landing') {
+    return <LandingPage onEnter={handleEnterSystem} onViewDocs={handleViewDocs} />;
+  }
+
+  if (view === 'docs') {
+    return <DocumentationPage onBack={handleBackToLanding} />;
+  }
 
   const currentSource = typeof selectedSource === 'number' ? discoveredSources[selectedSource] : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans flex flex-col h-screen">
+    <div className="min-h-screen flex flex-col relative">
+      {/* Ambient Grid Background */}
+      <div className="fixed inset-0 opacity-[0.03] pointer-events-none z-0"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(0, 240, 255, 0.5) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 240, 255, 0.5) 1px, transparent 1px)
+          `,
+          backgroundSize: '60px 60px'
+        }}
+      />
+
       <Header />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar 
-            sources={discoveredSources} 
-            selectedSource={selectedSource} 
-            onSelectSource={setSelectedSource}
-            isLoading={isLoading}
-            hasSearched={hasSearched}
+
+      <div className="flex flex-1 overflow-hidden relative z-10">
+        <Sidebar
+          sources={discoveredSources}
+          selectedSource={selectedSource}
+          onSelectSource={setSelectedSource}
+          isLoading={isLoading}
+          hasSearched={hasSearched}
         />
-        
+
         <main className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-8 border-b border-gray-200 bg-white">
-              { !hasSearched ? (
-                <>
-                  <p className="text-center text-gray-600 mb-8 text-lg max-w-2xl mx-auto">
-                      Describe the dataset you're looking for, or upload a local file, and our AI will generate a multi-strategy data sourcing plan for you.
-                  </p>
-                  <div className="max-w-2xl mx-auto">
-                      <SearchForm 
-                          onGenerate={handleGeneratePlan} 
-                          isLoading={isLoading} 
-                      />
-                      {error && !isLoading && <div className="mt-4"><ErrorMessage message={error} /></div>}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <CollapsedSearch 
-                    description={searchDescription}
-                    onNewSearch={handleNewSearch}
-                  />
-                  {error && !isLoading && !isRefining && <div className="mt-4 max-w-2xl mx-auto"><ErrorMessage message={error} /></div>}
-                </>
-              )}
+          {!hasSearched ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 lg:p-16">
+              <div className="w-full max-w-3xl">
+                {/* Title Section */}
+
+
+                <SearchForm
+                  onGenerate={handleGeneratePlan}
+                  isLoading={isLoading}
+                />
+                {error && !isLoading && <div className="mt-6"><ErrorMessage message={error} /></div>}
+              </div>
             </div>
-            
-            {isLoading ? (
-                <div className="flex-1 flex items-center justify-center">
+          ) : (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-6 border-b border-[var(--border-dim)]">
+                <CollapsedSearch
+                  description={searchDescription}
+                  onNewSearch={handleNewSearch}
+                />
+                {error && !isLoading && !isRefining && <div className="mt-4"><ErrorMessage message={error} /></div>}
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {isLoading ? (
+                  <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
                     <LoadingSpinner />
-                </div>
-            ) : (
-                <SourceDetail 
-                    source={currentSource} 
+                  </div>
+                ) : (
+                  <SourceDetail
+                    source={currentSource}
                     isRefining={isRefining}
                     onRefine={
-                        typeof selectedSource === 'number' 
+                      typeof selectedSource === 'number'
                         ? (instructions) => handleRefineSource(selectedSource, instructions)
                         : undefined
                     }
-                />
-            )}
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </main>
       </div>
-      <footer className="text-center py-4 text-gray-500 text-sm border-t border-gray-200 bg-white">
-        <p>Powered by a Multi-Agent Gemini System</p>
+
+      {/* Footer Status Bar */}
+      <footer className="border-t border-[var(--border-dim)] bg-[var(--bg-panel)] px-6 py-3 flex items-center justify-between relative z-10">
+        <div className="hud-status">
+          SYSTEM ONLINE
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="hud-barcode">
+            {[...Array(12)].map((_, i) => <span key={i}></span>)}
+          </div>
+          <span className="hud-label">GEMINI MULTI-AGENT CORE</span>
+        </div>
       </footer>
     </div>
   );

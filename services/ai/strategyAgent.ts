@@ -52,7 +52,7 @@ const STRATEGY_PROMPTS = {
 
 async function generate(prompt: string): Promise<Strategy> {
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.0-flash-exp',
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
