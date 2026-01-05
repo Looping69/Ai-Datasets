@@ -57,8 +57,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sources, selectedSource, onSelectSour
               key={index}
               onClick={() => onSelectSource(index)}
               className={`w-full text-left p-4 transition-all relative group ${isSelected
-                  ? 'bg-[var(--cyan-dim)] border-l-2 border-l-[var(--cyan-primary)]'
-                  : 'bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border-l-2 border-l-transparent'
+                ? 'bg-[var(--cyan-dim)] border-l-2 border-l-[var(--cyan-primary)]'
+                : 'bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border-l-2 border-l-transparent'
                 }`}
               style={{ clipPath: 'var(--clip-panel-sm)' }}
             >
@@ -71,8 +71,18 @@ const Sidebar: React.FC<SidebarProps> = ({ sources, selectedSource, onSelectSour
                     <h3 className={`font-semibold text-sm truncate ${isSelected ? 'text-[var(--cyan-primary)]' : 'text-[var(--text-normal)]'}`}>
                       {source.title || (isLocal ? 'LOCAL_ASSET' : 'REMOTE_NODE')}
                     </h3>
-                    <div className="hud-label mt-1">
-                      {source.accessMethod.replace('_', ' ')}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="hud-label">
+                        {source.accessMethod.replace('_', ' ')}
+                      </span>
+                      {source.confidence !== undefined && (
+                        <span className={`text-[10px] font-mono px-1 ${source.confidence >= 70 ? 'text-[var(--green-status)]' :
+                            source.confidence >= 50 ? 'text-[var(--orange-warn)]' :
+                              'text-red-400'
+                          }`}>
+                          {source.confidence}%
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

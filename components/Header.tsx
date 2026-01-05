@@ -43,7 +43,7 @@ const Header: React.FC = () => {
         </div>
         <div className="hud-status text-xs">
           <span className="text-[var(--text-muted)] mr-2">NODE:</span>
-          GEMINI-2.5
+          AI-CORE
         </div>
       </div>
     </header>

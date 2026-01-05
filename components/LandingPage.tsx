@@ -95,7 +95,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnter, onViewDocs }) => {
 
             {/* Footer */}
             <footer className="w-full py-8 border-t border-[var(--border-dim)] bg-white text-center text-slate-500 text-sm">
-                © 2026 DataScout AI. Powered by Google Gemini.
+                © 2026 DataScout AI. Powered by Multi-Agent AI.
             </footer>
         </div>
     );

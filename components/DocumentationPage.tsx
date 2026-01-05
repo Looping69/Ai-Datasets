@@ -36,7 +36,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ onBack }) => {
                 <article className="prose prose-slate max-w-none">
                     <h1 className="text-4xl font-bold text-[var(--text-bright)] mb-4">System Documentation</h1>
                     <p className="text-xl text-[var(--text-dim)] mb-12">
-                        Deployment controls, architecture overview, and operational protocols for the Gemini-2.0 DataScout swarm.
+                        Deployment controls, architecture overview, and operational protocols for the DataScout AI swarm.
                     </p>
 
                     <hr className="border-[var(--border-dim)] my-8" />
@@ -47,7 +47,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ onBack }) => {
                             Core Architecture
                         </h2>
                         <p className="mb-4 leading-relaxed">
-                            The system operates on a <strong>Multi-Agent Swarm</strong> architecture powered by Google's Gemini 2.0 Flash-Exp model. It decouples the discovery process into four distinct concurrent phases:
+                            The system operates on a <strong>Multi-Agent Swarm</strong> architecture powered by advanced AI models. It decouples the discovery process into four distinct concurrent phases:
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
                             <div className="p-4 border border-[var(--border-dim)] rounded-xl bg-[var(--bg-panel)]">
@@ -92,7 +92,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ onBack }) => {
                         <div className="bg-slate-50 border-l-4 border-[var(--orange-warn)] p-4 rounded-r-xl">
                             <h4 className="font-bold text-[var(--text-bright)] mb-2">API Connection Failures</h4>
                             <p className="text-sm">
-                                Ensure your <code>VITE_API_KEY</code> is set in the <code>.env</code> file. The system requires access to <code>gemini-2.0-flash-exp</code>. If rate limits are hit, the system will auto-retry with exponential backoff.
+                                Ensure your <code>VITE_API_KEY</code> is set in the <code>.env</code> file. The system requires a valid API key. If rate limits are hit, the system will auto-retry with exponential backoff.
                             </p>
                         </div>
                     </section>

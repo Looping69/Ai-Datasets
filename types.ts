@@ -11,15 +11,18 @@ export interface PlanSection {
  * This is more robust than parsing a markdown string.
  */
 export interface Strategy {
-    config?: string;  // Stringified JSON for Firecrawl config
-    schema?: string;  // Stringified JSON for data schema
-    snippet?: string; // Code snippet (e.g., curl, javascript, python)
+  config?: string;  // Stringified JSON for Firecrawl config
+  schema?: string;  // Stringified JSON for data schema
+  snippet?: string; // Code snippet (e.g., curl, javascript, python)
+  confidence?: number;       // 0-100 score of how reliable this strategy is
+  confidenceReason?: string; // Why this confidence level
 }
 
 export interface DiscoveredLink {
-    url: string;
-    accessMethod: AccessMethod;
-    justification: string;
-    strategy: Strategy; // Changed from string to a structured object
-    cleaningStrategy?: string; // Holds the result of the refinement agent
+  url: string;
+  accessMethod: AccessMethod;
+  justification: string;
+  confidence?: number;        // Confidence in the access method detection
+  strategy: Strategy;
+  cleaningStrategy?: string;
 }

@@ -34,7 +34,7 @@ const MarkdownContent: React.FC<{ content: string }> = ({ content }) => (
 );
 
 const StrategyRenderer: React.FC<{ strategy: Strategy; method: AccessMethod }> = ({ strategy, method }) => {
-    const { config, schema, snippet } = strategy;
+    const { config, schema, snippet, confidence, confidenceReason } = strategy;
 
     const SectionHeader: React.FC<{ title: string; code?: string }> = ({ title, code }) => (
         <div className="flex items-center gap-4 mb-4">
@@ -44,13 +44,39 @@ const StrategyRenderer: React.FC<{ strategy: Strategy; method: AccessMethod }> =
         </div>
     );
 
+    const ConfidenceInfo = () => {
+        if (confidence === undefined) return null;
+        const color = confidence >= 70
+            ? 'border-[var(--green-status)] text-[var(--green-status)]'
+            : confidence >= 50
+                ? 'border-[var(--orange-warn)] text-[var(--orange-warn)]'
+                : 'border-red-400 text-red-400';
+        return (
+            <div className={`mb-6 p-3 border-l-2 bg-[var(--bg-void)] ${color}`}>
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="hud-label">STRATEGY CONFIDENCE</span>
+                    <span className="font-mono text-sm">{confidence}%</span>
+                </div>
+                {confidenceReason && (
+                    <p className="text-[var(--text-muted)] text-sm">{confidenceReason}</p>
+                )}
+            </div>
+        );
+    };
+
     if (method === 'DIRECT_DOWNLOAD') {
-        return snippet ? <CodeSnippet language="bash" code={snippet} /> : <p className="text-[var(--text-muted)]">No download command provided.</p>;
+        return (
+            <div>
+                <ConfidenceInfo />
+                {snippet ? <CodeSnippet language="bash" code={snippet} /> : <p className="text-[var(--text-muted)]">No download command provided.</p>}
+            </div>
+        );
     }
 
     if (method === 'API') {
         return (
             <div className="space-y-8">
+                <ConfidenceInfo />
                 {snippet && (
                     <div>
                         <SectionHeader title="API REQUEST" code="FETCH" />
@@ -70,6 +96,7 @@ const StrategyRenderer: React.FC<{ strategy: Strategy; method: AccessMethod }> =
     if (method === 'WEB_CRAWL') {
         return (
             <div className="space-y-8">
+                <ConfidenceInfo />
                 {config && (
                     <div>
                         <SectionHeader title="SPIDER CONFIG" code="FIRECRAWL" />
@@ -89,6 +116,7 @@ const StrategyRenderer: React.FC<{ strategy: Strategy; method: AccessMethod }> =
     if (method === 'LOCAL_FILE') {
         return (
             <div className="space-y-8">
+                <ConfidenceInfo />
                 {snippet && (
                     <div>
                         <SectionHeader title="PROCESSOR" code="PYTHON" />
@@ -197,7 +225,22 @@ const SourceDetail: React.FC<SourceDetailProps> = ({ source, isRefining, onRefin
                 {/* Top-right Status */}
                 <div className="absolute top-4 right-4 flex items-center gap-3">
                     <span className="hud-label">{source.accessMethod.replace('_', ' ')}</span>
-                    <div className="w-2 h-2 bg-[var(--green-status)] shadow-[0_0_8px_var(--green-status)]"></div>
+                    {source.confidence !== undefined && (
+                        <span className={`text-xs font-mono px-2 py-0.5 border ${source.confidence >= 70
+                            ? 'text-[var(--green-status)] border-[var(--green-status)]'
+                            : source.confidence >= 50
+                                ? 'text-[var(--orange-warn)] border-[var(--orange-warn)]'
+                                : 'text-red-400 border-red-400'
+                            }`}>
+                            {source.confidence}% CONF
+                        </span>
+                    )}
+                    <div className={`w-2 h-2 shadow-[0_0_8px] ${source.confidence === undefined || source.confidence >= 70
+                        ? 'bg-[var(--green-status)] shadow-[var(--green-status)]'
+                        : source.confidence >= 50
+                            ? 'bg-[var(--orange-warn)] shadow-[var(--orange-warn)]'
+                            : 'bg-red-400 shadow-red-400'
+                        }`}></div>
                 </div>
 
                 {/* Header */}

@@ -28,11 +28,23 @@ export const SchemaEditor: React.FC<SchemaEditorProps> = ({ initialJsonString })
       if (typeof schemaObj !== 'object' || schemaObj === null) {
         throw new Error('Invalid schema format');
       }
-      const initialFields = Object.entries(schemaObj).map(([name, type], index) => ({
-        id: `field-${index}-${Date.now()}`,
-        name,
-        type: type as FieldType,
-      }));
+      const validTypes: FieldType[] = ['string', 'number', 'boolean', 'object', 'array', 'date'];
+      const initialFields = Object.entries(schemaObj).map(([name, type], index) => {
+        // Ensure type is a valid scalar string
+        let fieldType: FieldType = 'string';
+        if (typeof type === 'string' && validTypes.includes(type as FieldType)) {
+          fieldType = type as FieldType;
+        } else if (typeof type === 'object' && Array.isArray(type)) {
+          fieldType = 'array';
+        } else if (typeof type === 'object') {
+          fieldType = 'object';
+        }
+        return {
+          id: `field-${index}-${Date.now()}`,
+          name,
+          type: fieldType,
+        };
+      });
       setFields(initialFields);
     } catch (e) {
       console.error("Failed to parse initial schema JSON:", e);
@@ -115,7 +127,7 @@ export const SchemaEditor: React.FC<SchemaEditorProps> = ({ initialJsonString })
 
             {/* Field Type */}
             <select
-              value={field.type}
+              value={typeof field.type === 'string' ? field.type : 'string'}
               onChange={e => handleFieldChange(field.id, 'type', e.target.value)}
               className="bg-[var(--bg-panel)] border border-[var(--border-dim)] text-[var(--text-normal)] text-sm py-1 px-3 outline-none cursor-pointer focus:border-[var(--cyan-primary)]"
             >

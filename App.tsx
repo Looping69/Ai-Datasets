@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback } from 'react';
-import { useDiscovery } from './hooks/useDiscovery';
+import { useStreamingDiscovery } from './hooks/useStreamingDiscovery';
 import type { DiscoveredLink } from './types';
 
 import Header from './components/Header';
@@ -17,16 +17,28 @@ type ViewState = 'landing' | 'app' | 'docs';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('landing');
-
-  const [discoveredSources, setDiscoveredSources] = useState<DiscoveredLink[]>([]);
   const [selectedSource, setSelectedSource] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
   const [searchDescription, setSearchDescription] = useState('');
 
-  const { discoverDatasets, refineSource, extractLocalFile } = useDiscovery();
+  const {
+    sources: discoveredSources,
+    isDiscovering,
+    isProcessing,
+    pendingCount,
+    completedCount,
+    totalCount,
+    currentUrl,
+    error,
+    discoverDatasets,
+    extractLocalFile,
+    refineSource,
+    updateSource,
+    reset,
+  } = useStreamingDiscovery();
+
+  const isLoading = isDiscovering || isProcessing;
+  const hasSearched = searchDescription !== '' || discoveredSources.length > 0;
 
   const handleEnterSystem = useCallback(() => {
     setView('app');
@@ -41,64 +53,51 @@ const App: React.FC = () => {
   }, []);
 
   const handleGeneratePlan = useCallback(async (description: string, file: File | null) => {
-    setIsLoading(true);
-    setError(null);
-    setHasSearched(true);
     setSearchDescription(description || file?.name || 'File Analysis');
-    setDiscoveredSources([]);
     setSelectedSource(null);
 
     try {
-      let sources: DiscoveredLink[] = [];
       if (file) {
         const localSource = await extractLocalFile(file);
-        sources.push(localSource);
+        // For file uploads, we add directly
+        updateSource(0, localSource);
       }
       if (description.trim()) {
-        const webSources = await discoverDatasets(description);
-        sources = [...sources, ...webSources];
-      }
-
-      if (sources.length === 0 && !file && !description.trim()) {
-        setError('Please provide a description or upload a file.');
-      } else {
-        setDiscoveredSources(sources);
-        if (sources.length > 0) {
-          setSelectedSource(0);
-        }
+        // This will stream results progressively
+        await discoverDatasets(description);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'An unexpected error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
+      console.error('Generation failed:', e);
     }
-  }, [discoverDatasets, extractLocalFile]);
+  }, [discoverDatasets, extractLocalFile, updateSource]);
 
   const handleRefineSource = useCallback(async (sourceIndex: number, instructions: string) => {
     if (sourceIndex < 0 || sourceIndex >= discoveredSources.length) return;
 
     setIsRefining(true);
-    setError(null);
     try {
       const currentSource = discoveredSources[sourceIndex];
       const refined = await refineSource(currentSource, instructions);
-      setDiscoveredSources(prev =>
-        prev.map((src, i) => i === sourceIndex ? refined : src)
-      );
+      updateSource(sourceIndex, refined);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Refinement failed.');
+      console.error('Refinement failed:', e);
     } finally {
       setIsRefining(false);
     }
-  }, [discoveredSources, refineSource]);
+  }, [discoveredSources, refineSource, updateSource]);
 
   const handleNewSearch = useCallback(() => {
-    setHasSearched(false);
-    setDiscoveredSources([]);
+    reset();
     setSelectedSource(null);
-    setError(null);
     setSearchDescription('');
-  }, []);
+  }, [reset]);
+
+  // Auto-select first source when it becomes available
+  React.useEffect(() => {
+    if (discoveredSources.length > 0 && selectedSource === null) {
+      setSelectedSource(0);
+    }
+  }, [discoveredSources, selectedSource]);
 
   if (view === 'landing') {
     return <LandingPage onEnter={handleEnterSystem} onViewDocs={handleViewDocs} />;
@@ -138,9 +137,6 @@ const App: React.FC = () => {
           {!hasSearched ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 lg:p-16">
               <div className="w-full max-w-3xl">
-                {/* Title Section */}
-
-
                 <SearchForm
                   onGenerate={handleGeneratePlan}
                   isLoading={isLoading}
@@ -155,13 +151,41 @@ const App: React.FC = () => {
                   description={searchDescription}
                   onNewSearch={handleNewSearch}
                 />
+
+                {/* Streaming Progress Indicator */}
+                {isProcessing && (
+                  <div className="mt-4 p-3 bg-[var(--bg-surface)] border border-[var(--border-dim)]"
+                    style={{ clipPath: 'var(--clip-panel-sm)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="hud-label text-[var(--cyan-primary)]">PROCESSING</span>
+                      <span className="hud-label">{completedCount}/{totalCount} COMPLETE</span>
+                    </div>
+                    <div className="w-full h-1 bg-[var(--bg-void)] overflow-hidden">
+                      <div
+                        className="h-full bg-[var(--cyan-primary)] transition-all duration-300"
+                        style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
+                      />
+                    </div>
+                    {currentUrl && (
+                      <p className="text-xs text-[var(--text-muted)] mt-2 truncate">
+                        Analyzing: {currentUrl}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {error && !isLoading && !isRefining && <div className="mt-4"><ErrorMessage message={error} /></div>}
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {isLoading ? (
+                {isDiscovering ? (
                   <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
                     <LoadingSpinner />
+                    <p className="mt-4 hud-label text-[var(--text-muted)]">SCANNING FOR DATASETS...</p>
+                  </div>
+                ) : discoveredSources.length === 0 && !isProcessing ? (
+                  <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
+                    <p className="hud-label text-[var(--text-muted)]">NO SOURCES FOUND</p>
                   </div>
                 ) : (
                   <SourceDetail
@@ -183,13 +207,13 @@ const App: React.FC = () => {
       {/* Footer Status Bar */}
       <footer className="border-t border-[var(--border-dim)] bg-[var(--bg-panel)] px-6 py-3 flex items-center justify-between relative z-10">
         <div className="hud-status">
-          SYSTEM ONLINE
+          {isProcessing ? `PROCESSING ${pendingCount} REMAINING` : 'SYSTEM ONLINE'}
         </div>
         <div className="flex items-center gap-6">
           <div className="hud-barcode">
             {[...Array(12)].map((_, i) => <span key={i}></span>)}
           </div>
-          <span className="hud-label">GEMINI MULTI-AGENT CORE</span>
+          <span className="hud-label">MULTI-AGENT CORE</span>
         </div>
       </footer>
     </div>

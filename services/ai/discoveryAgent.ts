@@ -18,11 +18,12 @@ export interface DiscoveryResult {
 }
 
 export async function findDatasetUrls(datasetDescription: string): Promise<DiscoveryResult> {
+    let lastRawResponse = '';
     try {
         const prompt = DISCOVERY_PROMPT.replace('{DATASET_DESCRIPTION}', datasetDescription);
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.0-flash',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',
@@ -40,6 +41,7 @@ export async function findDatasetUrls(datasetDescription: string): Promise<Disco
             }
         });
 
+        lastRawResponse = response.text;
         const resultJson = JSON.parse(response.text);
         // Basic validation
         if (resultJson && Array.isArray(resultJson.urls)) {
@@ -49,7 +51,17 @@ export async function findDatasetUrls(datasetDescription: string): Promise<Disco
         }
 
     } catch (error) {
-        console.error("Error in Discovery Agent:", error);
-        throw new Error("The AI failed to discover dataset URLs. Please try refining your description.");
+        console.warn("Discovery Agent failed, attempting validation fix...", error);
+
+        try {
+            if (lastRawResponse) {
+                const { validateDiscovery } = await import('./validatorAgent');
+                return await validateDiscovery(lastRawResponse, datasetDescription);
+            }
+            throw new Error('No raw response for validation');
+        } catch (validationError) {
+            console.error("Critical failure in discovery:", validationError);
+            throw new Error("The AI failed to discover dataset URLs. Please try refining your description.");
+        }
     }
 }
