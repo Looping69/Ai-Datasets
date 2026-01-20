@@ -1,5 +1,4 @@
-
-import { ai } from './client';
+import { ai, DEFAULT_MODEL } from './client';
 
 const REFINEMENT_PROMPT = `
 You are an expert Data Pipeline Architect. Your task is to create a set of data cleaning and transformation steps based on user instructions, using an existing data ingestion strategy as context.
@@ -28,7 +27,7 @@ export async function getCleaningSteps(strategyContext: string, cleaningInstruct
             .replace('{CLEANING_INSTRUCTIONS}', cleaningInstructions);
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: DEFAULT_MODEL,
             contents: prompt
         });
 

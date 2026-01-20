@@ -1,5 +1,4 @@
-import { Type } from "@google/genai";
-import { ai } from './client';
+import { ai, DEFAULT_MODEL } from './client';
 
 const VALIDATOR_PROMPT = `
 You are a Quality Assurance AI. Your job is to validate and fix responses from other AI agents in a data pipeline system.
@@ -55,7 +54,7 @@ export async function validateAndFix<T>(
             .replace('{REQUIRED_FIELDS}', requiredFields.join(', '));
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: DEFAULT_MODEL,
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',

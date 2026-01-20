@@ -1,6 +1,6 @@
 
 # AI DATASET DISCOVERY PIPELINE
-### TACTICAL DATA INTERFACE // v2.0 // GEMINI-2.5-PRO
+### TACTICAL DATA INTERFACE // v2.0 // LATEST-AI-CORE
 
 ![Status](https://img.shields.io/badge/SYSTEM-ONLINE-green?style=for-the-badge) ![Core](https://img.shields.io/badge/CORE-MULTI--AGENT-cyan?style=for-the-badge) ![Design](https://img.shields.io/badge/UI-TACTICAL--LAB-white?style=for-the-badge)
 
@@ -13,7 +13,7 @@
 
 ## [MISSION BRIEFING]
 
-The **AI Dataset Discovery Pipeline** is a specialized tactical interface designed to accelerate the acquisition of machine learning data. Powered by a swarm of **Google Gemini 2.5 Pro** agents, it autonomously scans the web, analyzes target endpoints, and generates precise ingestion strategies—whether for direct downloads, API integration, or complex web crawling.
+The **AI Dataset Discovery Pipeline** is a specialized tactical interface designed to accelerate the acquisition of machine learning data. Powered by a swarm of advanced autonomous agents, it autonomously scans the web, analyzes target endpoints, and generates precise ingestion strategies—whether for direct downloads, API integration, or complex web crawling.
 
 Now features the **"Tactical Lab"** design system: a high-contrast, light-mode HUD optimized for data visibility and technical precision.
 
@@ -48,10 +48,10 @@ npm install
 ```
 
 ### 2. CONFIGURE CREDENTIALS
-Create a `.env` file in the root directory and input your Gemini API key:
+Create a `.env` file in the root directory and input your API key:
 
 ```env
-VITE_API_KEY=your_gemini_api_key_here
+VITE_API_KEY=your_api_key_here
 ```
 
 ### 3. LAUNCH SYSTEM

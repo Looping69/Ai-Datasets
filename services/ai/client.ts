@@ -9,3 +9,4 @@ if (apiKey === "NO_API_KEY_PROVIDED") {
 }
 
 export const ai = new GoogleGenAI({ apiKey });
+export const DEFAULT_MODEL = 'gemini-2.0-flash';
