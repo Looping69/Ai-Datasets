@@ -1,5 +1,5 @@
 import { Type } from "@google/genai";
-import { ai, DEFAULT_MODEL } from './client';
+import { ai, GEMINI_MODEL } from './client';
 
 const ANALYSIS_PROMPT = `
 You are an expert AI Web Analyst. Your task is to analyze a given URL and determine the most efficient, programmatic way to access the primary dataset it contains.
@@ -37,7 +37,7 @@ export async function analyzeUrlForAccessMethod(url: string): Promise<AnalysisRe
     try {
         const prompt = ANALYSIS_PROMPT.replace('{URL}', url);
         const response = await ai.models.generateContent({
-            model: DEFAULT_MODEL,
+            model: GEMINI_MODEL,
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',

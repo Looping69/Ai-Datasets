@@ -1,5 +1,5 @@
 import { Type } from "@google/genai";
-import { ai, DEFAULT_MODEL } from './client';
+import { ai, GEMINI_MODEL } from './client';
 import type { AccessMethod } from './analysisAgent';
 import type { Strategy } from '../../types';
 
@@ -61,7 +61,7 @@ async function generate(prompt: string, retries = 2): Promise<Strategy> {
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
             const response = await ai.models.generateContent({
-                model: DEFAULT_MODEL,
+                model: GEMINI_MODEL,
                 contents: prompt,
                 config: {
                     responseMimeType: 'application/json',
