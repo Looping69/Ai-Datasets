@@ -1,3 +1,4 @@
+import { Type } from "@google/genai";
 import { ai, DEFAULT_MODEL } from './client';
 
 const ANALYSIS_PROMPT = `

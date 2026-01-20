@@ -1,3 +1,4 @@
+import { Type } from "@google/genai";
 import { ai, DEFAULT_MODEL } from './client';
 import type { AccessMethod } from './analysisAgent';
 import type { Strategy } from '../../types';
