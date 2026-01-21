@@ -1,17 +1,18 @@
-import { ai, DEFAULT_MODEL } from './client';
+
+import { ai, GEMINI_MODEL } from './client';
 import type { AccessMethod } from './analysisAgent';
 import type { Strategy } from '../../types';
 
 const RESPONSE_SCHEMA = {
-    type: Type.OBJECT,
+    type: "OBJECT" as const,
     properties: {
-        config: { type: Type.STRING, description: "A stringified JSON object for Firecrawl configuration. Only for WEB_CRAWL." },
-        schema: { type: Type.STRING, description: "A stringified JSON object representing the proposed data schema." },
-        snippet: { type: Type.STRING, description: "A code snippet (e.g., curl, javascript, python)." },
-        confidence: { type: Type.NUMBER, description: "0-100 confidence score for this strategy." },
-        confidenceReason: { type: Type.STRING, description: "Brief explanation of confidence level." },
+        config: { type: "STRING" as const, description: "A stringified JSON object for Firecrawl configuration. Only for WEB_CRAWL." },
+        schema: { type: "STRING" as const, description: "A stringified JSON object representing the proposed data schema." },
+        snippet: { type: "STRING" as const, description: "A code snippet (e.g., curl, javascript, python)." },
+        confidence: { type: "NUMBER" as const, description: "0-100 confidence score for this strategy." },
+        confidenceReason: { type: "STRING" as const, description: "Brief explanation of confidence level." },
     },
-};
+}
 
 const STRATEGY_PROMPTS = {
     DIRECT_DOWNLOAD: `
@@ -60,7 +61,7 @@ async function generate(prompt: string, retries = 2): Promise<Strategy> {
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
             const response = await ai.models.generateContent({
-                model: DEFAULT_MODEL,
+                model: GEMINI_MODEL,
                 contents: prompt,
                 config: {
                     responseMimeType: 'application/json',

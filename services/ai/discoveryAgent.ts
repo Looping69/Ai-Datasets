@@ -1,4 +1,5 @@
-import { ai, DEFAULT_MODEL } from './client';
+
+import { ai, GEMINI_MODEL } from './client';
 
 const DISCOVERY_PROMPT = `
 You are an expert AI Research Assistant. Your mission is to find specific, direct URLs to dataset pages or download links based on a user's request.
@@ -22,17 +23,17 @@ export async function findDatasetUrls(datasetDescription: string): Promise<Disco
         const prompt = DISCOVERY_PROMPT.replace('{DATASET_DESCRIPTION}', datasetDescription);
 
         const response = await ai.models.generateContent({
-            model: DEFAULT_MODEL,
+            model: GEMINI_MODEL,
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',
                 responseSchema: {
-                    type: Type.OBJECT,
+                    type: "OBJECT" as const,
                     properties: {
                         urls: {
-                            type: Type.ARRAY,
+                            type: "ARRAY" as const,
                             items: {
-                                type: Type.STRING
+                                type: "STRING" as const
                             }
                         }
                     }
