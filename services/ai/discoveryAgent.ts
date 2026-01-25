@@ -1,16 +1,12 @@
 
 import { ai, GEMINI_MODEL } from './client';
+import { searchDatasets } from '../datasetService';
 
-const DISCOVERY_PROMPT = `
-You are an expert AI Research Assistant. Your mission is to find specific, direct URLs to dataset pages or download links based on a user's request.
+const QUERY_GEN_PROMPT = `
+You are a search query optimizer. Given a description of a dataset, generate a single, highly effective Google search query to find direct links to that data (CSV, JSON, data portals).
+DO NOT include any commentary, just the query.
 
-**CRITICAL INSTRUCTIONS:**
-1.  Prioritize direct links to dataset landing pages, CSV files, JSON files, or data portals.
-2.  AVOID generic links to repository homepages (like the front page of Kaggle or data.gov).
-3.  Return a list of 6-8 high-quality URLs.
-
-Here is the user's description of the dataset they need:
-"{DATASET_DESCRIPTION}"
+Dataset Description: "{DATASET_DESCRIPTION}"
 `;
 
 export interface DiscoveryResult {
@@ -18,49 +14,39 @@ export interface DiscoveryResult {
 }
 
 export async function findDatasetUrls(datasetDescription: string): Promise<DiscoveryResult> {
-    let lastRawResponse = '';
     try {
-        const prompt = DISCOVERY_PROMPT.replace('{DATASET_DESCRIPTION}', datasetDescription);
+        // 1. Generate an optimized search query using LLM
+        const queryResponse = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: QUERY_GEN_PROMPT.replace('{DATASET_DESCRIPTION}', datasetDescription),
+        });
 
+        const optimizedQuery = queryResponse.text.trim().replace(/^"|"$/g, '');
+        console.log(`Optimized Search Query: ${optimizedQuery}`);
+
+        // 2. Call the real search API via our backend
+        const urls = await searchDatasets(optimizedQuery || datasetDescription);
+
+        // 3. (Optional) Filter or rank URLs with LLM if too many
+        // For now, we'll return the top 8 results from the real search
+        return {
+            urls: urls.slice(0, 8)
+        };
+
+    } catch (error) {
+        console.error("Real Discovery failed, falling back to basic prompt:", error);
+
+        // Fallback to the old method if the search API fails
+        const prompt = `Find 5-8 candidate URLs for datasets related to: ${datasetDescription}. Return as JSON { "urls": [] }`;
         const response = await ai.models.generateContent({
             model: GEMINI_MODEL,
             contents: prompt,
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                    type: "OBJECT" as const,
-                    properties: {
-                        urls: {
-                            type: "ARRAY" as const,
-                            items: {
-                                type: "STRING" as const
-                            }
-                        }
-                    }
-                }
-            }
+            config: { responseMimeType: 'application/json' }
         });
 
-        lastRawResponse = response.text;
-        const resultJson = JSON.parse(response.text);
-        // Basic validation
-        if (resultJson && Array.isArray(resultJson.urls)) {
-            return resultJson;
-        } else {
-            throw new Error("Discovery agent returned an invalid format.");
-        }
-
-    } catch (error) {
-        console.warn("Discovery Agent failed, attempting validation fix...", error);
-
         try {
-            if (lastRawResponse) {
-                const { validateDiscovery } = await import('./validatorAgent');
-                return await validateDiscovery(lastRawResponse, datasetDescription);
-            }
-            throw new Error('No raw response for validation');
-        } catch (validationError) {
-            console.error("Critical failure in discovery:", validationError);
+            return JSON.parse(response.text);
+        } catch {
             throw new Error("The AI failed to discover dataset URLs. Please try refining your description.");
         }
     }

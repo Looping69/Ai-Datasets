@@ -1,28 +1,36 @@
 
 import { ai, GEMINI_MODEL } from './client';
+import { analyzeUrl, type AnalysisResponse } from '../datasetService';
 
 const ANALYSIS_PROMPT = `
-You are an expert AI Web Analyst. Your task is to analyze a given URL and determine the most efficient, programmatic way to access the primary dataset it contains.
+You are an expert AI Web Analyst. Your task is to analyze the metadata and content of a URL and determine the most efficient, programmatic way to access the primary dataset it contains.
 
-**URL to Analyze:** {URL}
+**URL:** {URL}
+**METADATA:**
+- Status Code: {STATUS}
+- Content-Type: {CONTENT_TYPE}
+- Content-Length: {CONTENT_LENGTH} bytes
+- Is Downloadable Link (Detected): {IS_DOWNLOADABLE}
 
-**DECISION RULES (apply in order):**
-1. DIRECT_DOWNLOAD (confidence 90-100): URL ends in .csv, .json, .xlsx, .zip, .parquet, .xml, or page has explicit download button/link
-2. DIRECT_DOWNLOAD (confidence 70-89): Page mentions "download" prominently with file format references
-3. API (confidence 90-100): URL contains /api/ or is a known API provider (api.github.com, data.gov API, etc.)
-4. API (confidence 70-89): Page documents REST/GraphQL endpoints or shows API responses
-5. WEB_CRAWL (confidence 50-69): Data is embedded in HTML and must be scraped
-6. WEB_CRAWL (confidence below 50): Fallback when unclear
+**CONTENT SNIPPET (First 2000 chars):**
+\`\`\`
+{SNIPPET}
+\`\`\`
+
+**DECISION RULES:**
+1. DIRECT_DOWNLOAD: If URL ends in data extension, Content-Type is a data format, or snippet shows raw data (CSV, JSON).
+2. API: If snippet shows API documentation, JSON objects with data records, or URL is a known API endpoint.
+3. WEB_CRAWL: If data is embedded in HTML tables or requires navigating complex JS.
 
 **Output Format:**
 Respond with a JSON object containing:
 - **accessMethod**: One of "DIRECT_DOWNLOAD", "API", or "WEB_CRAWL"
-- **target**: The download URL, API endpoint, or crawl target URL
-- **justification**: One-sentence explanation for your choice
-- **confidence**: Number 0-100 indicating how confident you are in this assessment
+- **target**: The actual data URL or API endpoint (may be same as original or a derived link)
+- **justification**: One-sentence explanation based on the metadata/content
+- **confidence**: Number 0-100 indicating assessment confidence
 `;
 
-export type AccessMethod = "DIRECT_DOWNLOAD" | "API" | "WEB_CRAWL";
+export type AccessMethod = "DIRECT_DOWNLOAD" | "API" | "WEB_CRAWL" | "LOCAL_FILE";
 
 export interface AnalysisResult {
     accessMethod: AccessMethod;
@@ -32,10 +40,19 @@ export interface AnalysisResult {
 }
 
 export async function analyzeUrlForAccessMethod(url: string): Promise<AnalysisResult> {
-    let lastRawResponse = '';
-
     try {
-        const prompt = ANALYSIS_PROMPT.replace('{URL}', url);
+        // 1. Real Analysis & URL Validation: Fetch metadata and content via backend
+        const metadata: AnalysisResponse = await analyzeUrl(url);
+
+        // 2. Classify based on real data using LLM
+        const prompt = ANALYSIS_PROMPT
+            .replace('{URL}', url)
+            .replace('{STATUS}', metadata.statusCode.toString())
+            .replace('{CONTENT_TYPE}', metadata.contentType)
+            .replace('{CONTENT_LENGTH}', metadata.contentLength.toString())
+            .replace('{IS_DOWNLOADABLE}', metadata.isDownloadable ? 'YES' : 'NO')
+            .replace('{SNIPPET}', metadata.contentSnippet);
+
         const response = await ai.models.generateContent({
             model: GEMINI_MODEL,
             contents: prompt,
@@ -54,50 +71,29 @@ export async function analyzeUrlForAccessMethod(url: string): Promise<AnalysisRe
             }
         });
 
-        lastRawResponse = response.text;
         const resultJson = JSON.parse(response.text);
 
-        // Validate the accessMethod value
-        const validMethods: AccessMethod[] = ["DIRECT_DOWNLOAD", "API", "WEB_CRAWL"];
-        if (resultJson && validMethods.includes(resultJson.accessMethod)) {
-            return {
-                accessMethod: resultJson.accessMethod,
-                target: resultJson.target,
-                justification: resultJson.justification,
-                confidence: resultJson.confidence ?? 50,
-            };
-        } else {
-            // Fallback if the model hallucinates a method
-            console.warn(`Analysis agent returned invalid accessMethod: ${resultJson.accessMethod}. Defaulting to WEB_CRAWL.`);
-            return {
-                accessMethod: "WEB_CRAWL",
-                target: url,
-                justification: "The access method could not be determined, defaulting to web crawl.",
-                confidence: 30,
-            };
-        }
-    } catch (error) {
-        console.warn(`Analysis Agent failed for URL ${url}, attempting validation fix...`, error);
+        // Map potential method name differences
+        let accessMethod: AccessMethod = "WEB_CRAWL";
+        if (resultJson.accessMethod === "DIRECT_DOWNLOAD") accessMethod = "DIRECT_DOWNLOAD";
+        else if (resultJson.accessMethod === "API") accessMethod = "API";
 
-        try {
-            if (lastRawResponse) {
-                const { validateAnalysis } = await import('./validatorAgent');
-                const fixed = await validateAnalysis(lastRawResponse, url);
-                return {
-                    accessMethod: fixed.accessMethod as AccessMethod,
-                    target: fixed.target,
-                    justification: fixed.justification,
-                    confidence: fixed.confidence
-                };
-            }
-            throw new Error('No raw response available for validation');
-        } catch (validationError) {
-            return {
-                accessMethod: "WEB_CRAWL",
-                target: url,
-                justification: "Critical error during analysis and validation. Defaulting to crawl.",
-                confidence: 0,
-            };
-        }
+        return {
+            accessMethod,
+            target: resultJson.target || url,
+            justification: resultJson.justification,
+            confidence: resultJson.confidence || 50,
+        };
+
+    } catch (error) {
+        console.warn(`Real Analysis failed for URL ${url}, falling back to heuristic:`, error);
+
+        // Final fallback: Basic heuristic if fetching or LLM fails
+        return {
+            accessMethod: "WEB_CRAWL",
+            target: url,
+            justification: "Automatic analysis failed. Defaulting to standard crawl.",
+            confidence: 20,
+        };
     }
 }
