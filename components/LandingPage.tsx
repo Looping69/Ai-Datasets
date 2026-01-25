@@ -6,9 +6,11 @@ import { RefineIcon } from './icons/RefineIcon';
 interface LandingPageProps {
     onEnter: () => void;
     onViewDocs: () => void;
+    onLogin?: () => void;
+    onSignup?: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onEnter, onViewDocs }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onEnter, onViewDocs, onLogin, onSignup }) => {
     return (
         <div className="min-h-screen relative overflow-x-hidden">
             {/* Top Bar */}
@@ -23,10 +25,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnter, onViewDocs }) => {
                         DATASCOUT
                     </h1>
                 </div>
-                <div className="hidden md:block">
-                    <span className="hud-status">
+                <div className="flex items-center gap-4">
+                    <span className="hud-status hidden md:block">
                         SYSTEM ACTIVE
                     </span>
+                    {onLogin && (
+                        <button onClick={onLogin} className="hud-button text-sm">
+                            LOGIN
+                        </button>
+                    )}
+                    {onSignup && (
+                        <button onClick={onSignup} className="hud-button-primary text-sm">
+                            SIGN UP
+                        </button>
+                    )}
                 </div>
             </header>
 

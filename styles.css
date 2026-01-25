@@ -211,6 +211,38 @@ body::before {
     box-shadow: var(--glow-cyan-intense);
 }
 
+/* ===== HUD INPUT ===== */
+.hud-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-surface);
+    border: 2px solid var(--border-dim);
+    color: var(--text-bright);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+    clip-path: var(--clip-panel-sm);
+    transition: all 0.3s ease;
+}
+
+.hud-input:focus {
+    outline: none;
+    border-color: var(--cyan-primary);
+    box-shadow: var(--glow-cyan);
+    background: var(--bg-panel);
+}
+
+.hud-input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.hud-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--bg-void);
+}
+
 /* ===== TYPOGRAPHY ===== */
 .hud-title {
     font-family: 'Orbitron', sans-serif;

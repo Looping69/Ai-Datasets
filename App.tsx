@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { useStreamingDiscovery } from './hooks/useStreamingDiscovery';
 import type { DiscoveredLink } from './types';
 
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import SearchForm from './components/SearchForm';
@@ -12,10 +13,13 @@ import ErrorMessage from './components/ErrorMessage';
 import CollapsedSearch from './components/CollapsedSearch';
 import LandingPage from './components/LandingPage';
 import DocumentationPage from './components/DocumentationPage';
+import LoginPage from './components/LoginPage';
+import SignupPage from './components/SignupPage';
+import ProfilePage from './components/ProfilePage';
 
-type ViewState = 'landing' | 'app' | 'docs';
+type ViewState = 'landing' | 'app' | 'docs' | 'login' | 'signup' | 'profile';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [view, setView] = useState<ViewState>('landing');
   const [selectedSource, setSelectedSource] = useState<number | null>(null);
   const [isRefining, setIsRefining] = useState(false);
@@ -49,6 +53,22 @@ const App: React.FC = () => {
   }, []);
 
   const handleBackToLanding = useCallback(() => {
+    setView('landing');
+  }, []);
+
+  const handleLogin = useCallback(() => {
+    setView('login');
+  }, []);
+
+  const handleSignup = useCallback(() => {
+    setView('signup');
+  }, []);
+
+  const handleProfile = useCallback(() => {
+    setView('profile');
+  }, []);
+
+  const handleBackFromAuth = useCallback(() => {
     setView('landing');
   }, []);
 
@@ -100,11 +120,23 @@ const App: React.FC = () => {
   }, [discoveredSources, selectedSource]);
 
   if (view === 'landing') {
-    return <LandingPage onEnter={handleEnterSystem} onViewDocs={handleViewDocs} />;
+    return <LandingPage onEnter={handleEnterSystem} onViewDocs={handleViewDocs} onLogin={handleLogin} onSignup={handleSignup} />;
   }
 
   if (view === 'docs') {
     return <DocumentationPage onBack={handleBackToLanding} />;
+  }
+
+  if (view === 'login') {
+    return <LoginPage onSwitchToSignup={handleSignup} onBack={handleBackFromAuth} />;
+  }
+
+  if (view === 'signup') {
+    return <SignupPage onSwitchToLogin={handleLogin} onBack={handleBackFromAuth} />;
+  }
+
+  if (view === 'profile') {
+    return <ProfilePage onBack={() => setView('app')} />;
   }
 
   const currentSource = typeof selectedSource === 'number' ? discoveredSources[selectedSource] : null;
@@ -217,6 +249,15 @@ const App: React.FC = () => {
         </div>
       </footer>
     </div>
+  );
+};
+
+// Wrap with AuthProvider
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
